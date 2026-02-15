@@ -208,15 +208,17 @@ export default function NotifyEditorPage() {
                 </div>
               )
             ) : (
-              <div className="bg-gray-50 p-8">
-                <div className="max-w-xs mx-auto">
-                  <div className="bg-white rounded-lg shadow-lg p-4 border border-gray-200">
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
-                      {smsContent || 'SMS preview will appear here'}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {smsContent.length} / 160 characters
-                    </p>
+              <div className="flex-1 flex flex-col items-center justify-center bg-white p-8">
+                <div className="w-full max-w-sm">
+                  <div className="flex flex-col items-end">
+                    <div className="bg-gray-200 rounded-3xl rounded-tr-none px-4 py-2 max-w-xs">
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
+                        {smsContent || 'SMS preview will appear here'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 text-xs text-gray-500 text-right">
+                    {smsContent.length} / 160 characters
                   </div>
                 </div>
               </div>
