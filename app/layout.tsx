@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Nunito_Sans, Noto_Sans } from 'next/font/google'
+import { Toaster } from '@/components/ui/sonner'
 
 import './globals.css'
 
@@ -20,7 +21,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={notoSans.variable}>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        {children}
+        <Toaster />
+      </body>
     </html>
   )
 }

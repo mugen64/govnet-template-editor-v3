@@ -22,19 +22,17 @@ import type { EditorConfig } from '@/lib/editor-types'
 
 interface EditorListProps {
   editors: EditorConfig[]
-  onAddEditor: () => void
   onDeleteEditor: (editorId: string) => void
   onSelectEditor: (editor: EditorConfig) => void
 }
 
 export function EditorList({
   editors,
-  onAddEditor,
   onDeleteEditor,
   onSelectEditor,
 }: EditorListProps) {
   const getEditorIcon = (type: string) => {
-    return type === 'notification' ? (
+    return type === 'notify' ? (
       <Bell className="h-5 w-5" />
     ) : (
       <FileText className="h-5 w-5" />
@@ -50,12 +48,7 @@ export function EditorList({
             Create your first editor to get started with template editing
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button onClick={onAddEditor} size="lg" className="gap-2">
-            <Plus className="h-5 w-5" />
-            Create New Editor
-          </Button>
-        </CardContent>
+       
       </Card>
     )
   }
@@ -114,7 +107,7 @@ export function EditorList({
                       <p className="text-sm">
                         {editor.credentials.length} credential
                         {editor.credentials.length !== 1 ? 's' : ''} in{' '}
-                        {editor.credentialLocation === 'header'
+                        {editor.credentialsType === 'header'
                           ? 'request header'
                           : 'query parameter'}
                       </p>

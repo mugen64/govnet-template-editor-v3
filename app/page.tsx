@@ -7,6 +7,12 @@ import { useEditorStorage } from '@/hooks/useEditorStorage'
 import { NotificationTemplateEditor } from '@/components/NotificationTemplateEditor'
 import { DocumentTemplateEditor } from '@/components/DocumentTemplateEditor'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { ArrowLeft, Plus } from 'lucide-react'
 import type { EditorConfig } from '@/lib/editor-types'
 
@@ -34,22 +40,6 @@ export default function Page() {
     )
   }
 
-  if (showAddForm) {
-    return (
-      <main className="min-h-screen bg-background">
-        <div className="mx-auto max-w-6xl px-4 py-8">
-          <AddEditorForm
-            onSave={(editor) => {
-              saveEditor(editor)
-              setShowAddForm(false)
-            }}
-            onCancel={() => setShowAddForm(false)}
-          />
-        </div>
-      </main>
-    )
-  }
-
   if (selectedEditor) {
     return (
       <main className="min-h-screen bg-background">
@@ -68,14 +58,14 @@ export default function Page() {
               {selectedEditor.name}
             </h1>
             <p className="mt-2 text-muted-foreground">
-              {selectedEditor.type === 'notification'
-                ? 'Notification Template'
-                : 'PDF Template'}{' '}
+              {selectedEditor.type === 'notify'
+                ? 'Notify Template'
+                : 'Docify Template'}{' '}
               Editor
             </p>
           </div>
 
-          {selectedEditor.type === 'notification' ? (
+          {selectedEditor.type === 'notify' ? (
             <NotificationTemplateEditor config={selectedEditor} />
           ) : (
             <DocumentTemplateEditor config={selectedEditor} />
@@ -110,10 +100,25 @@ export default function Page() {
 
         <EditorList
           editors={editors}
-          onAddEditor={() => setShowAddForm(true)}
           onDeleteEditor={deleteEditor}
           onSelectEditor={setSelectedEditor}
         />
+
+        <Dialog open={showAddForm} onOpenChange={setShowAddForm} >
+          <DialogContent className="w-full max-w-2xl  max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Add New Editor</DialogTitle>
+            </DialogHeader>
+            <AddEditorForm
+              existingEditors={editors}
+              onSave={(editor) => {
+                saveEditor(editor)
+                setShowAddForm(false)
+              }}
+              onCancel={() => setShowAddForm(false)}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </main>
   )

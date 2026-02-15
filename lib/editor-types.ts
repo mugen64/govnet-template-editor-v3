@@ -1,6 +1,6 @@
-export type EditorType = 'notification' | 'pdf'
+export type EditorType = 'notify' | 'docify'
 export type SyncMode = 'local' | 'online'
-export type CredentialLocation = 'header' | 'query'
+export type CredentialsType = 'header' | 'query'
 
 export interface Credential {
   key: string
@@ -13,7 +13,7 @@ export interface EditorConfig {
   type: EditorType
   syncMode: SyncMode
   apiUrl: string
-  credentialLocation: CredentialLocation
+  credentialsType: CredentialsType
   credentials: Credential[]
   createdAt: string
   updatedAt: string

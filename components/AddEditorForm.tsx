@@ -19,20 +19,21 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Plus, Trash2 } from 'lucide-react'
-import type { EditorConfig, EditorType, SyncMode, CredentialLocation } from '@/lib/editor-types'
+import type { EditorConfig, EditorType, SyncMode, CredentialsType } from '@/lib/editor-types'
 import { toast } from 'sonner'
 
 interface AddEditorFormProps {
+  existingEditors: EditorConfig[]
   onSave: (editor: EditorConfig) => void
   onCancel: () => void
 }
 
-export function AddEditorForm({ onSave, onCancel }: AddEditorFormProps) {
+export function AddEditorForm({ existingEditors, onSave, onCancel }: AddEditorFormProps) {
   const [name, setName] = useState('')
-  const [type, setType] = useState<EditorType>('notification')
+  const [type, setType] = useState<EditorType>('notify')
   const [syncMode, setSyncMode] = useState<SyncMode>('online')
   const [apiUrl, setApiUrl] = useState('')
-  const [credentialLocation, setCredentialLocation] = useState<CredentialLocation>('header')
+  const [credentialsType, setCredentialsType] = useState<CredentialsType>('header')
   const [credentials, setCredentials] = useState<Array<{ key: string; value: string }>>([
     { key: '', value: '' },
   ])
@@ -63,6 +64,16 @@ export function AddEditorForm({ onSave, onCancel }: AddEditorFormProps) {
       return
     }
 
+    // Check if editor with same name already exists (case-insensitive)
+    const nameExists = existingEditors.some(
+      (editor) => editor.name.toLowerCase() === name.trim().toLowerCase()
+    )
+    
+    if (nameExists) {
+      toast.error(`An editor with the name "${name.trim()}" already exists`)
+      return
+    }
+
     if (!apiUrl.trim() && syncMode === 'online') {
       toast.error('API URL is required for online mode')
       return
@@ -76,7 +87,7 @@ export function AddEditorForm({ onSave, onCancel }: AddEditorFormProps) {
       type,
       syncMode,
       apiUrl: apiUrl.trim(),
-      credentialLocation,
+      credentialsType,
       credentials: validCredentials,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -87,7 +98,7 @@ export function AddEditorForm({ onSave, onCancel }: AddEditorFormProps) {
   }
 
   return (
-    <Card className="max-w-2xl">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>Create New Editor</CardTitle>
         <CardDescription>
@@ -96,36 +107,36 @@ export function AddEditorForm({ onSave, onCancel }: AddEditorFormProps) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-2 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="editor-name">Editor Name</Label>
               <Input
                 id="editor-name"
-                placeholder="My Notification Editor"
+                placeholder="My Template Editor"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 w-full">
               <Label htmlFor="editor-type">Editor Type</Label>
-              <Select value={type} onValueChange={(value) => setType(value as EditorType)}>
-                <SelectTrigger id="editor-type">
+              <Select  value={type} onValueChange={(value) => setType(value as EditorType)}>
+                <SelectTrigger id="editor-type" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="notification">Notification</SelectItem>
-                  <SelectItem value="pdf">PDF</SelectItem>
+                  <SelectItem value="notify">Notify</SelectItem>
+                  <SelectItem value="docify">Docify</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 w-full">
             <div className="space-y-2">
               <Label htmlFor="sync-mode">Sync Mode</Label>
               <Select value={syncMode} onValueChange={(value) => setSyncMode(value as SyncMode)}>
-                <SelectTrigger id="sync-mode">
+                <SelectTrigger id="sync-mode" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -151,14 +162,14 @@ export function AddEditorForm({ onSave, onCancel }: AddEditorFormProps) {
           {syncMode === 'online' && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="credential-location">Credentials Location</Label>
+                <Label htmlFor="credentials-type">Credentials Type</Label>
                 <Select
-                  value={credentialLocation}
+                  value={credentialsType}
                   onValueChange={(value) =>
-                    setCredentialLocation(value as CredentialLocation)
+                    setCredentialsType(value as CredentialsType)
                   }
                 >
-                  <SelectTrigger id="credential-location">
+                  <SelectTrigger id="credentials-type" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -185,24 +196,28 @@ export function AddEditorForm({ onSave, onCancel }: AddEditorFormProps) {
 
                 <div className="space-y-3">
                   {credentials.map((cred, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        placeholder="Key (e.g., Authorization)"
-                        value={cred.key}
-                        onChange={(e) =>
-                          handleCredentialChange(index, 'key', e.target.value)
-                        }
-                        className="flex-1"
-                      />
-                      <Input
-                        placeholder="Value (e.g., Bearer token...)"
-                        type="password"
-                        value={cred.value}
-                        onChange={(e) =>
-                          handleCredentialChange(index, 'value', e.target.value)
-                        }
-                        className="flex-1"
-                      />
+                    <div key={index} className="flex gap-3 items-center">
+                      <div className=" min-w-0">
+                        <Input
+                          placeholder="Key (e.g., Authorization)"
+                          value={cred.key}
+                          onChange={(e) =>
+                            handleCredentialChange(index, 'key', e.target.value)
+                          }
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <Input
+                          placeholder="Value (e.g., Bearer token...)"
+                          type="password"
+                          value={cred.value}
+                          onChange={(e) =>
+                            handleCredentialChange(index, 'value', e.target.value)
+                          }
+                          className="w-full"
+                        />
+                      </div>
                       {credentials.length > 1 && (
                         <Button
                           type="button"
