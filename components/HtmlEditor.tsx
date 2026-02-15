@@ -1,11 +1,8 @@
 'use client'
 
-import dynamic from 'next/dynamic'
-
-const Editor = dynamic(() => import('@monaco-editor/react'), {
-  loading: () => <div className="flex items-center justify-center h-full text-muted-foreground">Loading editor...</div>,
-  ssr: false,
-})
+import { useRef } from 'react'
+import Editor from '@monaco-editor/react'
+import { useTheme } from 'next-themes'
 
 export interface HtmlEditorProps {
   htmlContent: string
@@ -14,6 +11,17 @@ export interface HtmlEditorProps {
 }
 
 export function HtmlEditor({ htmlContent, onHtmlChange, zoom }: HtmlEditorProps) {
+  const editorRef = useRef<any>(null)
+  const { resolvedTheme } = useTheme()
+
+  const handleEditorDidMount = (editor: any, monaco: any) => {
+    editorRef.current = editor
+  }
+
+  const getEditorTheme = () => {
+    return resolvedTheme === 'dark' ? 'vs-dark' : 'vs'
+  }
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="bg-muted/50 px-4 py-2 border-b border-border">
@@ -25,7 +33,8 @@ export function HtmlEditor({ htmlContent, onHtmlChange, zoom }: HtmlEditorProps)
           defaultLanguage="html"
           value={htmlContent}
           onChange={(value) => onHtmlChange(value || '')}
-          theme="vs-dark"
+          theme={getEditorTheme()}
+          onMount={handleEditorDidMount}
           options={{
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
@@ -34,6 +43,14 @@ export function HtmlEditor({ htmlContent, onHtmlChange, zoom }: HtmlEditorProps)
             wordWrap: 'on',
             formatOnPaste: true,
             formatOnType: true,
+            automaticLayout: true,
+            folding: true,
+            // bracketMatching: 'always',
+            autoIndent: 'full',
+            suggestOnTriggerCharacters: true,
+            quickSuggestions: true,
+            parameterHints: { enabled: true },
+            hover: { enabled: true },
           }}
         />
       </div>
