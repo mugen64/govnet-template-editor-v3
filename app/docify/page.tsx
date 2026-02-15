@@ -13,6 +13,16 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
   Pagination,
   PaginationContent,
   PaginationEllipsis,
@@ -64,6 +74,10 @@ export default function DocifyPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [createName, setCreateName] = useState('')
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
 
   useEffect(() => {
     if (isLoaded && editorId) {
@@ -81,9 +95,11 @@ export default function DocifyPage() {
   }, [isLoaded, editorId, getEditor])
 
   const buildAuthHeaders = useCallback(
-    (editorConfig: EditorConfig): HeadersInit => {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
+    (editorConfig: EditorConfig, includeJson: boolean = true): HeadersInit => {
+      const headers: HeadersInit = {}
+
+      if (includeJson) {
+        headers['Content-Type'] = 'application/json'
       }
 
       if (
@@ -104,22 +120,43 @@ export default function DocifyPage() {
     []
   )
 
+  const appendQueryCredentials = (
+    url: string,
+    editorConfig: EditorConfig
+  ): string => {
+    if (
+      editorConfig.syncMode === 'online' &&
+      editorConfig.credentialsType === 'query'
+    ) {
+      const pairs = editorConfig.credentials
+        .filter((cred) => cred.key && cred.value)
+        .map(
+          (cred) =>
+            `${encodeURIComponent(cred.key)}=${encodeURIComponent(cred.value)}`
+        )
+
+      if (pairs.length > 0) {
+        const separator = url.includes('?') ? '&' : '?'
+        return `${url}${separator}${pairs.join('&')}`
+      }
+    }
+
+    return url
+  }
+
   const buildUrl = useCallback(
     (baseUrl: string, editorConfig: EditorConfig): string => {
       let url = `${baseUrl}/templates`
 
-      if (
-        editorConfig.syncMode === 'online' &&
-        editorConfig.credentialsType === 'query'
-      ) {
-        editorConfig.credentials.forEach((cred) => {
-          if (cred.key && cred.value) {
-            url += `&${encodeURIComponent(cred.key)}=${encodeURIComponent(cred.value)}`
-          }
-        })
-      }
+      return appendQueryCredentials(url, editorConfig)
+    },
+    []
+  )
 
-      return url
+  const buildDocumentGeneratorUrl = useCallback(
+    (baseUrl: string, editorConfig: EditorConfig): string => {
+      const url = `${baseUrl}templates`
+      return appendQueryCredentials(url, editorConfig)
     },
     []
   )
@@ -203,6 +240,85 @@ export default function DocifyPage() {
 
   const handleNextPage = () => {
     setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+  }
+
+  const handleCreateTemplate = async () => {
+    if (!editor) {
+      setCreateError('Editor not loaded yet.')
+      return
+    }
+
+    if (!createName.trim()) {
+      setCreateError('Template name is required.')
+      return
+    }
+
+    try {
+      setIsCreating(true)
+      setCreateError(null)
+
+      const sampleHtml = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sample Template</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
+      h1 { font-size: 20px; margin: 0 0 12px; }
+      p { margin: 0 0 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>Sample PDF Template</h1>
+    <p>This is a placeholder HTML file for a new PDF template.</p>
+    <p>Replace this content with your actual template markup.</p>
+  </body>
+</html>
+`
+
+      const file = new File([sampleHtml], 'sample-template.html', {
+        type: 'text/html',
+      })
+
+      const formData = new FormData()
+      formData.append('name', createName.trim())
+      formData.append('file', file)
+      formData.append('folderName', '')
+      formData.append('tags', JSON.stringify([]))
+      formData.append(
+        'pageSettings',
+        JSON.stringify({
+          pageSize: 'A4',
+          orientation: 'portrait',
+          marginTop: 15,
+          marginBottom: 15,
+          marginLeft: 15,
+          marginRight: 15,
+        })
+      )
+      formData.append('sampleJsonData', JSON.stringify({}))
+
+      const headers = buildAuthHeaders(editor, false)
+      const url = buildDocumentGeneratorUrl(editor.apiUrl, editor)
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create template')
+      }
+
+      setIsCreateOpen(false)
+      setCreateName('')
+      await fetchTemplates(editor)
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   const truncateContent = (content: string, length: number = 100) => {
@@ -291,7 +407,7 @@ export default function DocifyPage() {
                 Create and manage your PDF document templates
               </p>
             </div>
-            <Button className="gap-2">
+            <Button className="gap-2" onClick={() => setIsCreateOpen(true)}>
               <Plus className="h-4 w-4" />
               New PDF Template
             </Button>
@@ -483,6 +599,54 @@ export default function DocifyPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold">
+              Create New PDF Template
+            </DialogTitle>
+            <DialogDescription>
+              Enter a name for your new PDF template to get started.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="template-name">Template Name</Label>
+            <Input
+              id="template-name"
+              placeholder="e.g., MY_NEW_INVOICE"
+              value={createName}
+              onChange={(event) => setCreateName(event.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              This will be used as the template name (all caps, alphanumeric, or
+              underscores).
+            </p>
+          </div>
+
+          {createError && (
+            <p className="text-xs text-destructive">{createError}</p>
+          )}
+
+          <DialogFooter className="pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateOpen(false)}
+              disabled={isCreating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateTemplate}
+              disabled={!editor || isCreating}
+              className="gap-2"
+            >
+              {isCreating ? 'Creating...' : 'Create Template'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }
