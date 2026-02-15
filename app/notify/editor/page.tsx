@@ -28,6 +28,7 @@ import {
   Monitor,
   Tablet,
   Smartphone,
+  Home,
 } from 'lucide-react'
 
 interface NotificationTemplate {
@@ -166,6 +167,11 @@ export default function NotifyEditorPage() {
       {/* Header */}
       <div className="border-b border-border px-4 py-4">
         <div className="flex items-center gap-3">
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Home className="h-4 w-4" />
+            </Button>
+          </Link>
           <Button variant="ghost" size="icon" onClick={handleBack} className="h-8 w-8">
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -290,7 +296,7 @@ export default function NotifyEditorPage() {
                   <div className="w-full max-w-sm">
                     <div className="flex flex-col items-end">
                       <div className="bg-gray-200 rounded-3xl rounded-tr-none px-4 py-2 max-w-xs">
-                        <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap wrap-break-word">
                           {smsContent || 'SMS preview will appear here'}
                         </p>
                       </div>

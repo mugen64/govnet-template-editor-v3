@@ -30,6 +30,7 @@ import {
   ZoomIn,
   ZoomOut,
   Variable,
+  Home,
 } from 'lucide-react'
 
 interface PdfTemplate {
@@ -152,6 +153,11 @@ export default function DocifyEditorPage() {
       <div className="border-b border-border p-2">
         <div className="mx-aut flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="h-10 w-10">
+                <Home className="h-4 w-4" />
+              </Button>
+            </Link>
             <Button variant="ghost" size="icon" onClick={handleBack} className="h-10 w-10">
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -178,7 +184,7 @@ export default function DocifyEditorPage() {
           value={currentEditor}
           onValueChange={handleEditorChange}
           orientation="vertical"
-          className="w-auto bg-muted border-r border-border"
+          className="w-full bg-muted border-r border-border"
         >
           <TabsList variant="default" className="flex-col items-center h-full w-12 p-2 gap-4 bg-muted border-0 rounded-none">
             <TabsTrigger value="code" title="Code View" className="w-full cursor-pointer hover:bg-accent">
@@ -192,7 +198,7 @@ export default function DocifyEditorPage() {
             </TabsTrigger>
           </TabsList>
 
-          <ResizablePanelGroup orientation="horizontal" className="flex-1">
+          <ResizablePanelGroup orientation="horizontal" className="flex-1 w-full">
             <ResizablePanel defaultSize={50} minSize={30}>
               <TabsContent value="code" className="flex-1 flex-col overflow-hidden flex h-full">
                 <HtmlEditor
