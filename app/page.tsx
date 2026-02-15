@@ -1,34 +1,36 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { AddEditorForm } from '@/components/AddEditorForm'
-import { EditorList } from '@/components/EditorList'
-import { useEditorStorage } from '@/hooks/useEditorStorage'
-import { NotificationTemplateEditor } from '@/components/NotificationTemplateEditor'
-import { DocumentTemplateEditor } from '@/components/DocumentTemplateEditor'
-import { Button } from '@/components/ui/button'
+import { useState, useEffect } from "react";
+import { AddEditorForm } from "@/components/AddEditorForm";
+import { EditorList } from "@/components/EditorList";
+import { useEditorStorage } from "@/hooks/useEditorStorage";
+import { NotificationTemplateEditor } from "@/components/NotificationTemplateEditor";
+import { DocumentTemplateEditor } from "@/components/DocumentTemplateEditor";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { ArrowLeft, Plus } from 'lucide-react'
-import type { EditorConfig } from '@/lib/editor-types'
+} from "@/components/ui/dialog";
+import { ArrowLeft, Plus } from "lucide-react";
+import type { EditorConfig } from "@/lib/editor-types";
 
 export default function Page() {
-  const { editors, isLoaded, saveEditor, deleteEditor } = useEditorStorage()
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [selectedEditor, setSelectedEditor] = useState<EditorConfig | null>(null)
+  const { editors, isLoaded, saveEditor, deleteEditor } = useEditorStorage();
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedEditor, setSelectedEditor] = useState<EditorConfig | null>(
+    null,
+  );
 
   useEffect(() => {
     if (selectedEditor) {
-      const updated = editors.find((e) => e.id === selectedEditor.id)
+      const updated = editors.find((e) => e.id === selectedEditor.id);
       if (updated) {
-        setSelectedEditor(updated)
+        setSelectedEditor(updated);
       }
     }
-  }, [editors, selectedEditor])
+  }, [editors, selectedEditor]);
 
   if (!isLoaded) {
     return (
@@ -37,13 +39,13 @@ export default function Page() {
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </main>
-    )
+    );
   }
 
   if (selectedEditor) {
     return (
       <main className="min-h-screen bg-background">
-        <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="mx-auto max-w-4xl px-4 py-8">
           <Button
             variant="ghost"
             onClick={() => setSelectedEditor(null)}
@@ -58,28 +60,30 @@ export default function Page() {
               {selectedEditor.name}
             </h1>
             <p className="mt-2 text-muted-foreground">
-              {selectedEditor.type === 'notify'
-                ? 'Notify Template'
-                : 'Docify Template'}{' '}
+              {selectedEditor.type === "notify"
+                ? "Notify Template"
+                : "Docify Template"}{" "}
               Editor
             </p>
           </div>
 
-          {selectedEditor.type === 'notify' ? (
+          {selectedEditor.type === "notify" ? (
             <NotificationTemplateEditor config={selectedEditor} />
           ) : (
             <DocumentTemplateEditor config={selectedEditor} />
           )}
         </div>
       </main>
-    )
+    );
   }
 
   return (
     <main className="min-h-screen bg-background">
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Welcome to Govnet Template Editor</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Welcome to Govnet Template Editor
+          </h1>
           <p className="mt-2 text-muted-foreground">
             Create and manage template editors with flexible API integration
           </p>
@@ -89,7 +93,8 @@ export default function Page() {
           <div>
             <h2 className="text-2xl font-bold">Your Editors</h2>
             <p className="text-sm text-muted-foreground">
-              {editors.length} editor{editors.length !== 1 ? 's' : ''} configured
+              {editors.length} editor{editors.length !== 1 ? "s" : ""}{" "}
+              configured
             </p>
           </div>
           <Button onClick={() => setShowAddForm(true)} className="gap-2">
@@ -104,7 +109,7 @@ export default function Page() {
           onSelectEditor={setSelectedEditor}
         />
 
-        <Dialog open={showAddForm} onOpenChange={setShowAddForm} >
+        <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
           <DialogContent className="w-full max-w-2xl  max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Editor</DialogTitle>
@@ -112,8 +117,8 @@ export default function Page() {
             <AddEditorForm
               existingEditors={editors}
               onSave={(editor) => {
-                saveEditor(editor)
-                setShowAddForm(false)
+                saveEditor(editor);
+                setShowAddForm(false);
               }}
               onCancel={() => setShowAddForm(false)}
             />
@@ -121,5 +126,5 @@ export default function Page() {
         </Dialog>
       </div>
     </main>
-  )
+  );
 }

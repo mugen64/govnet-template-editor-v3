@@ -1,0 +1,12 @@
+{
+  "lsp": {
+    "tailwindcss-language-server": {
+      "settings": {
+        "classFunctions": ["cva", "cx"],
+        "experimental": {
+          "classRegex": ["[cls|className|class]\\s\\:\\=\\s\"([^\"]*)"]
+        }
+      }
+    }
+  }
+}

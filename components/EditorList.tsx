@@ -1,13 +1,13 @@
-'use client'
+"use client";
 
-import { Button } from '@/components/ui/button'
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
+} from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,14 +16,14 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
-import { Bell, FileText, Plus, Trash2 } from 'lucide-react'
-import type { EditorConfig } from '@/lib/editor-types'
+} from "@/components/ui/alert-dialog";
+import { Bell, FileText, Plus, Trash2 } from "lucide-react";
+import type { EditorConfig } from "@/lib/editor-types";
 
 interface EditorListProps {
-  editors: EditorConfig[]
-  onDeleteEditor: (editorId: string) => void
-  onSelectEditor: (editor: EditorConfig) => void
+  editors: EditorConfig[];
+  onDeleteEditor: (editorId: string) => void;
+  onSelectEditor: (editor: EditorConfig) => void;
 }
 
 export function EditorList({
@@ -32,12 +32,12 @@ export function EditorList({
   onSelectEditor,
 }: EditorListProps) {
   const getEditorIcon = (type: string) => {
-    return type === 'notify' ? (
+    return type === "notify" ? (
       <Bell className="h-5 w-5" />
     ) : (
       <FileText className="h-5 w-5" />
-    )
-  }
+    );
+  };
 
   if (editors.length === 0) {
     return (
@@ -48,9 +48,8 @@ export function EditorList({
             Create your first editor to get started with template editing
           </CardDescription>
         </CardHeader>
-       
       </Card>
-    )
+    );
   }
 
   return (
@@ -67,7 +66,8 @@ export function EditorList({
                   <div>
                     <CardTitle className="capitalize">{editor.name}</CardTitle>
                     <CardDescription className="capitalize">
-                      {editor.type} • {editor.syncMode === 'online' ? 'Online' : 'Local'}
+                      {editor.type} •{" "}
+                      {editor.syncMode === "online" ? "Online" : "Local"}
                     </CardDescription>
                   </div>
                 </div>
@@ -80,8 +80,8 @@ export function EditorList({
                   <AlertDialogContent>
                     <AlertDialogTitle>Delete Editor</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete "{editor.name}"? This action
-                      cannot be undone.
+                      Are you sure you want to delete "{editor.name}"? This
+                      action cannot be undone.
                     </AlertDialogDescription>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
@@ -95,21 +95,25 @@ export function EditorList({
               </div>
             </CardHeader>
             <CardContent className="flex-1 space-y-3">
-              {editor.syncMode === 'online' && (
+              {editor.syncMode === "online" && (
                 <>
                   <div>
                     <p className="text-xs text-muted-foreground">API URL</p>
-                    <p className="break-all text-sm font-mono">{editor.apiUrl}</p>
+                    <p className="break-all text-sm font-mono">
+                      {editor.apiUrl}
+                    </p>
                   </div>
                   {editor.credentials.length > 0 && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Credentials</p>
+                      <p className="text-xs text-muted-foreground">
+                        Credentials
+                      </p>
                       <p className="text-sm">
                         {editor.credentials.length} credential
-                        {editor.credentials.length !== 1 ? 's' : ''} in{' '}
-                        {editor.credentialsType === 'header'
-                          ? 'request header'
-                          : 'query parameter'}
+                        {editor.credentials.length !== 1 ? "s" : ""} in{" "}
+                        {editor.credentialsType === "header"
+                          ? "request header"
+                          : "query parameter"}
                       </p>
                     </div>
                   )}
@@ -122,18 +126,21 @@ export function EditorList({
                 </p>
               </div>
             </CardContent>
-            <div className="border-t px-6 py-3">
+            <div className="border-t px-6 py-3 flex justify-between">
               <Button
-                onClick={() => onSelectEditor(editor)}
-                variant="outline"
-                className="w-full"
+                onClick={() =>
+                  (location.href = "/" + editor.type + "?editorId=" + editor.id)
+                }
               >
                 Open Editor
+              </Button>
+              <Button onClick={() => onSelectEditor(editor)} variant="outline">
+                Edit
               </Button>
             </div>
           </Card>
         ))}
       </div>
     </div>
-  )
+  );
 }
