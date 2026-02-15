@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   Card,
   CardContent,
@@ -11,61 +12,190 @@ import {
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
+import { Plus, ChevronLeft } from 'lucide-react'
+import { useEditorStorage } from '@/hooks/useEditorStorage'
+import type { EditorConfig } from '@/lib/editor-types'
 
 interface PdfTemplate {
   id: string
-  title: string
+  name: string
+  refNumber?: string
+  fileName?: string
+  folderName?: string
+  sampleJsonData?: string
+  pageSettings?: {
+    pageSize?: string
+    orientation?: string
+    marginLeft?: number
+    marginRight?: number
+    marginTop?: number
+    marginBottom?: number
+  }
   createdAt: string
-  content: string
-  variables?: number
-  format?: string
+  updatedAt?: string
+  deletedAt?: string | null
 }
 
 interface TemplatesResponse {
-  templates: PdfTemplate[]
-  total: number
-  page: number
-  pageSize: number
-  totalPages: number
+  data?: PdfTemplate[]
 }
 
 const ITEMS_PER_PAGE = 6
 
 export default function DocifyPage() {
+  const searchParams = useSearchParams()
+  const editorId = searchParams.get('editorId')
+  const { getEditor, isLoaded } = useEditorStorage()
+
+  const [editor, setEditor] = useState<EditorConfig | null>(null)
   const [templates, setTemplates] = useState<PdfTemplate[]>([])
+  const [filteredTemplates, setFilteredTemplates] = useState<PdfTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
-    fetchTemplates(currentPage)
-  }, [currentPage])
-
-  const fetchTemplates = async (page: number) => {
-    try {
-      setLoading(true)
-      setError(null)
-      
-      const response = await fetch(
-        `/api/templates?page=${page}&pageSize=${ITEMS_PER_PAGE}`
-      )
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch templates')
+    if (isLoaded && editorId) {
+      const editorConfig = getEditor(editorId)
+      if (editorConfig) {
+        setEditor(editorConfig)
+      } else {
+        setError('Editor not found. Please select a valid editor.')
+        setLoading(false)
       }
-      
-      const data: TemplatesResponse = await response.json()
-      setTemplates(data.templates)
-      setTotalPages(data.totalPages || Math.ceil(data.total / ITEMS_PER_PAGE))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-      setTemplates([])
-    } finally {
+    } else if (isLoaded && !editorId) {
+      setError('No editor ID provided. Please select an editor from the home page.')
       setLoading(false)
     }
-  }
+  }, [isLoaded, editorId, getEditor])
+
+  const buildAuthHeaders = useCallback(
+    (editorConfig: EditorConfig): HeadersInit => {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      }
+
+      if (
+        editorConfig.syncMode === 'online' &&
+        editorConfig.credentials.length > 0
+      ) {
+        if (editorConfig.credentialsType === 'header') {
+          editorConfig.credentials.forEach((cred) => {
+            if (cred.key && cred.value) {
+              headers[cred.key] = cred.value
+            }
+          })
+        }
+      }
+
+      return headers
+    },
+    []
+  )
+
+  const buildUrl = useCallback(
+    (baseUrl: string, editorConfig: EditorConfig): string => {
+      let url = `${baseUrl}/templates`
+
+      if (
+        editorConfig.syncMode === 'online' &&
+        editorConfig.credentialsType === 'query'
+      ) {
+        editorConfig.credentials.forEach((cred) => {
+          if (cred.key && cred.value) {
+            url += `&${encodeURIComponent(cred.key)}=${encodeURIComponent(cred.value)}`
+          }
+        })
+      }
+
+      return url
+    },
+    []
+  )
+
+  const fetchTemplates = useCallback(
+    async (editorConfig: EditorConfig) => {
+      if (!editorConfig.apiUrl) {
+        setError('API URL not configured for this editor.')
+        setLoading(false)
+        return
+      }
+
+      try {
+        setLoading(true)
+        setError(null)
+
+        const headers = buildAuthHeaders(editorConfig)
+        const url = buildUrl(editorConfig.apiUrl, editorConfig)
+
+        const response = await fetch(url, { headers })
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch templates')
+        }
+
+        const data: TemplatesResponse = await response.json()
+        setTemplates(data.data || [])
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred')
+        setTemplates([])
+      } finally {
+        setLoading(false)
+      }
+    },
+    [buildAuthHeaders, buildUrl]
+  )
+
+  useEffect(() => {
+    if (editor) {
+      fetchTemplates(editor)
+    }
+  }, [editor, fetchTemplates])
+
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredTemplates(templates)
+    } else {
+      const query = searchQuery.toLowerCase()
+      setFilteredTemplates(
+        templates.filter((template) =>
+          [
+            template.name,
+            template.refNumber,
+            template.fileName,
+            template.folderName,
+            template.sampleJsonData,
+          ]
+            .filter(Boolean)
+            .some((value) => value?.toLowerCase().includes(query))
+        )
+      )
+    }
+  }, [searchQuery, templates])
+
+  useEffect(() => {
+    const nextTotalPages = Math.max(
+      1,
+      Math.ceil(filteredTemplates.length / ITEMS_PER_PAGE)
+    )
+    setTotalPages(nextTotalPages)
+    setCurrentPage((prev) => Math.min(prev, nextTotalPages))
+  }, [filteredTemplates])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
 
   const handlePreviousPage = () => {
     setCurrentPage((prev) => Math.max(1, prev - 1))
@@ -89,6 +219,42 @@ export default function DocifyPage() {
       hour: '2-digit',
       minute: '2-digit',
     })
+  }
+
+  const getTemplateTitle = (template: PdfTemplate): string => {
+    const title = template.name || template.fileName || 'Untitled'
+    return title.split('_').join(' ') ;
+  }
+
+  const getTemplateContent = (template: PdfTemplate): string => {
+    return template.sampleJsonData || ''
+  }
+
+  const getTemplatePageSettings = (template: PdfTemplate): string => {
+    const pageSize = template.pageSettings?.pageSize
+    const orientation = template.pageSettings?.orientation
+    if (pageSize && orientation) {
+      return `${pageSize} • ${orientation}`
+    }
+    return pageSize || orientation || ''
+  }
+
+  const paginatedTemplates = filteredTemplates.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
+
+  const getPaginationRange = () => {
+    const maxPagesToShow = 5
+    let start = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2))
+    let end = start + maxPagesToShow - 1
+
+    if (end > totalPages) {
+      end = totalPages
+      start = Math.max(1, end - maxPagesToShow + 1)
+    }
+
+    return { start, end }
   }
 
   return (
@@ -136,6 +302,8 @@ export default function DocifyPage() {
             <input
               type="text"
               placeholder="Search PDF templates..."
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
               className="w-full max-w-sm rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             />
           </div>
@@ -161,29 +329,31 @@ export default function DocifyPage() {
           )}
 
           {/* Empty State */}
-          {!loading && templates.length === 0 && !error && (
+          {!loading && filteredTemplates.length === 0 && !error && (
             <Card>
               <CardContent className="pt-6">
                 <p className="text-center text-sm text-muted-foreground">
-                  No templates found. Create your first PDF template to get started.
+                  {searchQuery
+                    ? 'No templates match your search. Try a different query.'
+                    : 'No templates found. Create your first PDF template to get started.'}
                 </p>
               </CardContent>
             </Card>
           )}
 
           {/* Templates Grid */}
-          {!loading && templates.length > 0 && (
+          {!loading && filteredTemplates.length > 0 && (
             <>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
-                {templates.map((template) => (
+                {paginatedTemplates.map((template) => (
                   <Card
                     key={template.id}
                     className="cursor-pointer transition-all hover:shadow-md hover:ring-2 hover:ring-ring/50"
                   >
                     <CardHeader>
                       <div className="space-y-2">
-                        <CardTitle className="text-lg truncate">
-                          {template.title}
+                        <CardTitle className="text-lg truncate wrap-break-word">
+                          {getTemplateTitle(template)}
                         </CardTitle>
                         <CardDescription className="text-xs">
                           {formatDate(template.createdAt)}
@@ -193,19 +363,25 @@ export default function DocifyPage() {
                     <CardContent className="space-y-4">
                       {/* Content Preview */}
                       <div className="rounded-sm bg-muted/30 p-3 font-mono text-xs text-muted-foreground max-h-24 overflow-hidden">
-                        <code>{truncateContent(template.content)}</code>
+                        <code>{truncateContent(getTemplateContent(template))}</code>
                       </div>
 
                       {/* Stats */}
                       <div className="flex flex-wrap gap-2">
-                        {template.variables !== undefined && (
-                          <Badge variant="secondary" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                            {template.variables} variables
+                        {template.refNumber && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          >
+                            {template.refNumber}
                           </Badge>
                         )}
-                        {template.format && (
-                          <Badge variant="secondary" className="bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400">
-                            {template.format}
+                        {getTemplatePageSettings(template) && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400"
+                          >
+                            {getTemplatePageSettings(template)}
                           </Badge>
                         )}
                       </div>
@@ -219,28 +395,89 @@ export default function DocifyPage() {
                 <div className="text-sm text-muted-foreground">
                   Page {currentPage} of {totalPages}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePreviousPage}
-                    disabled={currentPage === 1}
-                    className="gap-2"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleNextPage}
-                    disabled={currentPage >= totalPages}
-                    className="gap-2"
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Pagination className="mx-0 w-auto">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          handlePreviousPage()
+                        }}
+                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+
+                    {getPaginationRange().start > 1 && (
+                      <>
+                        <PaginationItem>
+                          <PaginationLink
+                            href="#"
+                            onClick={(event) => {
+                              event.preventDefault()
+                              setCurrentPage(1)
+                            }}
+                          >
+                            1
+                          </PaginationLink>
+                        </PaginationItem>
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      </>
+                    )}
+
+                    {Array.from(
+                      { length: getPaginationRange().end - getPaginationRange().start + 1 },
+                      (_, index) => getPaginationRange().start + index
+                    ).map((page) => (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          href="#"
+                          isActive={page === currentPage}
+                          onClick={(event) => {
+                            event.preventDefault()
+                            setCurrentPage(page)
+                          }}
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+
+                    {getPaginationRange().end < totalPages && (
+                      <>
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                        <PaginationItem>
+                          <PaginationLink
+                            href="#"
+                            onClick={(event) => {
+                              event.preventDefault()
+                              setCurrentPage(totalPages)
+                            }}
+                          >
+                            {totalPages}
+                          </PaginationLink>
+                        </PaginationItem>
+                      </>
+                    )}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          handleNextPage()
+                        }}
+                        className={
+                          currentPage >= totalPages ? 'pointer-events-none opacity-50' : ''
+                        }
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
               </div>
             </>
           )}
