@@ -1,0 +1,268 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { EmailEditor } from '@/components/EmailEditor'
+import { SmsEditor } from '@/components/SmsEditor'
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs'
+import {
+  ChevronLeft,
+  Mail,
+  MessageSquare,
+  ZoomIn,
+  ZoomOut,
+  RefreshCw,
+  Save,
+} from 'lucide-react'
+
+interface NotificationTemplate {
+  id: string
+  key?: string
+  subject?: string
+  sender?: string
+  sms?: string
+  email?: string
+  bcc?: string[]
+  cc?: string[]
+  data?: unknown
+  createdAt: string
+  updatedAt?: string
+  type?: 'SMS' | 'EMAIL' | 'PUSH' | string
+  channel?: string
+}
+
+export default function NotifyEditorPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const editorId = searchParams.get('editorId')
+  const templateId = searchParams.get('templateId')
+  const currentEditor = searchParams.get('editor') || 'email'
+
+  const [template, setTemplate] = useState<NotificationTemplate | null>(null)
+  const [emailContent, setEmailContent] = useState('')
+  const [smsContent, setSmsContent] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [zoom, setZoom] = useState(100)
+
+  useEffect(() => {
+    if (!templateId) {
+      setLoading(false)
+      return
+    }
+
+    const storedData = localStorage.getItem(`template-${templateId}`)
+    if (storedData) {
+      try {
+        const { expiry, template: storedTemplate } = JSON.parse(storedData)
+
+        if (expiry && Date.now() > expiry) {
+          alert('The template data has expired. Please select the template again from the list.')
+          return
+        }
+
+        setTemplate(storedTemplate)
+        setEmailContent(storedTemplate.email || '')
+        setSmsContent(storedTemplate.sms || '')
+        setLoading(false)
+      } catch (err) {
+        console.error('Failed to parse stored template:', err)
+        setLoading(false)
+      }
+    } else {
+      setLoading(false)
+    }
+  }, [templateId])
+
+  const handleBack = () => {
+    if (templateId) {
+      localStorage.removeItem(`template-${templateId}`)
+    }
+    router.push(`/notify?editorId=${editorId}`)
+  }
+
+  const getTemplateName = (): string => {
+    if (!template) return 'Unknown Template'
+    return template.subject || template.key || 'Untitled'
+  }
+
+  const handleEditorChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('editor', value)
+    router.push(`?${params.toString()}`, { scroll: false })
+  }
+
+  const handleEmailChange = useCallback((value: string) => {
+    setEmailContent(value)
+  }, [])
+
+  const handleSmsChange = useCallback((value: string) => {
+    setSmsContent(value)
+  }, [])
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto max-w-7xl px-4 py-8">
+          <p className="text-muted-foreground">Loading template...</p>
+        </div>
+      </main>
+    )
+  }
+
+  if (!template) {
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto max-w-7xl px-4 py-8">
+          <p className="text-destructive">Template not found. Please select a template from the list.</p>
+          <Button onClick={handleBack} className="mt-4">
+            Back to Templates
+          </Button>
+        </div>
+      </main>
+    )
+  }
+
+  return (
+    <main className="min-h-screen bg-background flex flex-col">
+      {/* Header */}
+      <div className="border-b border-border px-4 py-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={handleBack} className="h-8 w-8">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold">{getTemplateName()}</h1>
+            {template.key && <p className="text-xs text-muted-foreground">{template.key}</p>}
+          </div>
+        </div>
+      </div>
+
+      {/* Editor Section */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar with Tabs */}
+        <Tabs
+          value={currentEditor}
+          onValueChange={handleEditorChange}
+          orientation="vertical"
+          className="w-auto bg-muted border-r border-border"
+        >
+          <TabsList variant="default" className="flex-col items-center h-full w-12 p-2 gap-4 bg-muted border-0 rounded-none">
+            <TabsTrigger value="email" title="Email Editor" className="w-full cursor-pointer hover:bg-accent">
+              <Mail className="h-10 w-10" />
+            </TabsTrigger>
+            <TabsTrigger value="sms" title="SMS Editor" className="w-full cursor-pointer hover:bg-accent">
+              <MessageSquare className="h-10 w-10" />
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="email" className="flex-1 flex-col overflow-hidden flex">
+            <EmailEditor
+              emailContent={emailContent}
+              onEmailChange={handleEmailChange}
+              zoom={zoom}
+            />
+          </TabsContent>
+
+          <TabsContent value="sms" className="flex-1 flex-col overflow-hidden flex">
+            <SmsEditor
+              smsContent={smsContent}
+              onSmsChange={handleSmsChange}
+              zoom={zoom}
+            />
+          </TabsContent>
+        </Tabs>
+
+        {/* Right: Live Preview */}
+        <div className="flex-1 flex flex-col border-l border-border">
+          <div className="bg-muted/50 px-4 py-2 border-b border-border">
+            <p className="text-xs font-medium text-muted-foreground">
+              {currentEditor === 'email' ? 'Email Preview' : 'SMS Preview'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {currentEditor === 'email' ? 'Live preview of your email template' : 'How your SMS will appear on mobile devices'}
+            </p>
+          </div>
+
+          <div className="flex-1 overflow-auto">
+            {currentEditor === 'email' ? (
+              emailContent ? (
+                <div className="bg-white p-4">
+                  <iframe
+                    title="Email Preview"
+                    srcDoc={emailContent}
+                    className="w-full border-0"
+                    style={{ minHeight: '400px' }}
+                    sandbox="allow-scripts"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full bg-gray-50">
+                  <p className="text-muted-foreground">Enter HTML to see email preview</p>
+                </div>
+              )
+            ) : (
+              <div className="bg-gray-50 p-8">
+                <div className="max-w-xs mx-auto">
+                  <div className="bg-white rounded-lg shadow-lg p-4 border border-gray-200">
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
+                      {smsContent || 'SMS preview will appear here'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {smsContent.length} / 160 characters
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Toolbar */}
+      <div className="fixed bottom-4 right-4 flex items-center gap-2 bg-background border border-border rounded-lg p-2 shadow-lg">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          title="Zoom In"
+          onClick={() => setZoom((prev) => Math.min(prev + 10, 200))}
+        >
+          <ZoomIn className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          title="Zoom Out"
+          onClick={() => setZoom((prev) => Math.max(prev - 10, 50))}
+        >
+          <ZoomOut className="h-4 w-4" />
+        </Button>
+        <div className="w-px h-6 bg-border" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          title="Refresh"
+        >
+          <RefreshCw className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          title="Save"
+        >
+          <Save className="h-4 w-4" />
+        </Button>
+      </div>
+    </main>
+  )
+}

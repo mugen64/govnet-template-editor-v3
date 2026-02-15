@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import {
   Card,
@@ -63,6 +64,7 @@ interface TemplatesResponse {
 const ITEMS_PER_PAGE = 6;
 
 export default function NotifyPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const editorId = searchParams.get("editorId");
   const { getEditor, isLoaded } = useEditorStorage();
@@ -251,6 +253,16 @@ export default function NotifyPage() {
     return template.sms || template.email || "";
   };
 
+  const handleTemplateClick = (template: NotificationTemplate) => {
+    const expiry = Date.now() + 24 * 60 * 60 * 1000 // 24 hours from now
+    const data = {
+      expiry,
+      template,
+    }
+    localStorage.setItem(`template-${template.id}`, JSON.stringify(data))
+    router.push(`/notify/editor?editorId=${editorId}&templateId=${template.id}`)
+  };
+
   const getTemplateTitle = (template: NotificationTemplate): string => {
     return template.subject || template.key || "Untitled";
   };
@@ -358,6 +370,7 @@ export default function NotifyPage() {
                   <Card
                     key={template.id}
                     className="cursor-pointer transition-all hover:shadow-md hover:ring-2 hover:ring-ring/50"
+                    onClick={() => handleTemplateClick(template)}
                   >
                     <CardHeader>
                       <div className="flex items-start justify-between gap-2">
