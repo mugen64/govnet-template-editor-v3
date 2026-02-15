@@ -1,8 +1,9 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import Editor from '@monaco-editor/react'
 import { useTheme } from 'next-themes'
+import { attachEditorKeyboardHandler } from '@/lib/editor-shortcuts'
 
 export interface SmsEditorProps {
   smsContent: string
@@ -16,7 +17,14 @@ export function SmsEditor({ smsContent, onSmsChange, zoom }: SmsEditorProps) {
 
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor
+    editor.focus()
   }
+
+  useEffect(() => {
+    if (!editorRef.current) return
+    const cleanup = attachEditorKeyboardHandler(editorRef.current, 'text')
+    return cleanup
+  }, [])
 
   const getEditorTheme = () => {
     return resolvedTheme === 'dark' ? 'vs-dark' : 'vs'
