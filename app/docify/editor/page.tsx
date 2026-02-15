@@ -1,10 +1,31 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect, useContext } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft } from 'lucide-react'
+import { HtmlEditor } from '@/components/HtmlEditor'
+import { VariableEditor } from '@/components/VariableEditor'
+import { SettingsEditor } from '@/components/SettingsEditor'
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs'
+import {
+  ChevronLeft,
+  Code,
+  Eye,
+  Settings,
+  Download,
+  Copy,
+  RefreshCw,
+  Save,
+  ZoomIn,
+  ZoomOut,
+  Variable,
+} from 'lucide-react'
 
 interface PdfTemplate {
   id: string
@@ -31,11 +52,14 @@ export default function DocifyEditorPage() {
   const searchParams = useSearchParams()
   const editorId = searchParams.get('editorId')
   const templateId = searchParams.get('templateId')
+  const currentEditor = searchParams.get('editor') || 'code'
 
   const [template, setTemplate] = useState<PdfTemplate | null>(null)
   const [htmlContent, setHtmlContent] = useState('')
+  const [variablesContent, setVariablesContent] = useState('{}')
   const [loading, setLoading] = useState(true)
   const [previewMode, setPreviewMode] = useState<'html' | 'pdf'>('html')
+  const [zoom, setZoom] = useState(100)
 
   useEffect(() => {
     if (!templateId) {
@@ -80,6 +104,20 @@ export default function DocifyEditorPage() {
     return template.name || template.fileName || 'Untitled'
   }
 
+  const handleEditorChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('editor', value)
+    router.push(`?${params.toString()}`, { scroll: false })
+  }
+
+  const handleHtmlChange = useCallback((value: string) => {
+    setHtmlContent(value)
+  }, [])
+
+  const handleVariablesChange = useCallback((value: string) => {
+    setVariablesContent(value)
+  }, [])
+
   if (loading) {
     return (
       <main className="min-h-screen bg-background">
@@ -106,10 +144,10 @@ export default function DocifyEditorPage() {
   return (
     <main className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <div className="border-b border-border px-4 py-4">
-        <div className="mx-auto max-w-7xl flex items-center justify-between">
+      <div className="border-b border-border p-2">
+        <div className="mx-aut flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={handleBack} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={handleBack} className="h-10 w-10">
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div>
@@ -130,22 +168,45 @@ export default function DocifyEditorPage() {
 
       {/* Editor Section */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left: HTML Editor */}
-        <div className="flex-1 flex flex-col border-r border-border">
-          <div className="bg-muted/50 px-4 py-2 border-b border-border">
-            <p className="text-xs font-medium text-muted-foreground">HTML Template</p>
-          </div>
-          <textarea
-            value={htmlContent}
-            onChange={(e) => setHtmlContent(e.target.value)}
-            placeholder="Enter your HTML template here..."
-            className="flex-1 p-4 font-mono text-sm bg-background text-foreground resize-none focus:outline-none border-0"
-            spellCheck="false"
-          />
-        </div>
+        {/* Sidebar with Tabs */}
+        <Tabs
+          value={currentEditor}
+          onValueChange={handleEditorChange}
+          orientation="vertical"
+          className="w-auto bg-muted border-r border-border"
+        >
+          <TabsList variant="default" className="flex-col items-center h-full w-12 p-2 gap-4 bg-muted border-0 rounded-none">
+            <TabsTrigger value="code" title="Code View" className="w-full cursor-pointer hover:bg-accent">
+              <Code className="h-10 w-10" />
+            </TabsTrigger>
+            <TabsTrigger value="variables" title="Variables" className="w-full cursor-pointer hover:bg-accent">
+              <Variable className="h-10 w-10" />
+            </TabsTrigger>
+            <TabsTrigger value="settings" title="Settings" className="w-full cursor-pointer hover:bg-accent">
+              <Settings className="h-10 w-10" />
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="code" className="flex-1 flex-col overflow-hidden flex">
+            <HtmlEditor
+              htmlContent={htmlContent}
+              onHtmlChange={handleHtmlChange}
+              zoom={zoom}
+            />
+          </TabsContent>
+          <TabsContent value="variables" className="flex-1 flex-col overflow-hidden flex">
+            <VariableEditor
+              variablesContent={variablesContent}
+              onVariablesChange={handleVariablesChange}
+              zoom={zoom}
+            />
+          </TabsContent>
+          <TabsContent value="settings" className="flex-1 flex-col overflow-hidden flex">
+            <SettingsEditor />
+          </TabsContent>
+        </Tabs>
 
         {/* Right: Live Preview */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col border-l border-border">
           <div className="bg-muted/50 px-4 py-2 border-b border-border">
             <p className="text-xs font-medium text-muted-foreground">Live Preview</p>
           </div>
