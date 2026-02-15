@@ -8,247 +8,321 @@ import { HtmlEditor } from '@/components/HtmlEditor'
 import { VariableEditor } from '@/components/VariableEditor'
 import { SettingsEditor } from '@/components/SettingsEditor'
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
 } from '@/components/ui/tabs'
 import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
+    ResizableHandle,
+    ResizablePanel,
+    ResizablePanelGroup,
 } from '@/components/ui/resizable'
 import {
-  ChevronLeft,
-  Code,
-  Eye,
-  Settings,
-  Download,
-  Copy,
-  RefreshCw,
-  Save,
-  ZoomIn,
-  ZoomOut,
-  Variable,
-  Home,
+    ChevronLeft,
+    Code,
+    Eye,
+    Settings,
+    Download,
+    Copy,
+    RefreshCw,
+    Save,
+    ZoomIn,
+    ZoomOut,
+    Variable,
+    Home,
 } from 'lucide-react'
+import { useEditorStorage } from '@/hooks/useEditorStorage'
+import type { EditorConfig } from '@/lib/editor-types'
 
 interface PdfTemplate {
-  id: string
-  name: string
-  refNumber?: string
-  fileName?: string
-  folderName?: string
-  sampleJsonData?: string
-  pageSettings?: {
-    pageSize?: string
-    orientation?: string
-    marginLeft?: number
-    marginRight?: number
-    marginTop?: number
-    marginBottom?: number
-  }
-  createdAt: string
-  updatedAt?: string
-  deletedAt?: string | null
+    id: string
+    name: string
+    refNumber?: string
+    fileName?: string
+    folderName?: string
+    sampleJsonData?: string
+    pageSettings?: {
+        pageSize?: string
+        orientation?: string
+        marginLeft?: number
+        marginRight?: number
+        marginTop?: number
+        marginBottom?: number
+    }
+    createdAt: string
+    updatedAt?: string
+    deletedAt?: string | null
 }
 
 export default function DocifyEditorPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const editorId = searchParams.get('editorId')
-  const templateId = searchParams.get('templateId')
-  const currentEditor = searchParams.get('editor') || 'code'
+    const router = useRouter()
+    const searchParams = useSearchParams()
+    const editorId = searchParams.get('editorId')
+    const templateId = searchParams.get('templateId')
+    const currentEditor = searchParams.get('editor') || 'code'
 
-  const [template, setTemplate] = useState<PdfTemplate | null>(null)
-  const [htmlContent, setHtmlContent] = useState('')
-  const [variablesContent, setVariablesContent] = useState('{}')
-  const [loading, setLoading] = useState(true)
-  const [previewMode, setPreviewMode] = useState<'html' | 'pdf'>('html')
-  const [zoom, setZoom] = useState(100)
+    const { getEditor, isLoaded } = useEditorStorage()
 
-  useEffect(() => {
-    if (!templateId) {
-      setLoading(false)
-      return
-    }
+    const [editor, setEditor] = useState<EditorConfig | null>(null)
+    const [template, setTemplate] = useState<PdfTemplate | null>(null)
+    const [initialHtmlContent, setInitialHtmlContent] = useState('')
+    const [htmlContent, setHtmlContent] = useState('')
+    const [variablesContent, setVariablesContent] = useState('{}')
+    const [loading, setLoading] = useState(true)
+    const [previewMode, setPreviewMode] = useState<'html' | 'pdf'>('html')
+    const [zoom, setZoom] = useState(100)
 
-    const storedData = localStorage.getItem(`template-${templateId}`)
-    if (storedData) {
-      try {
-        const { expiry, template: storedTemplate } = JSON.parse(storedData)
-        
-        // Check if expired
-        if (expiry && Date.now() > expiry) {
-        //   localStorage.removeItem(`template-${templateId}`)
-        //   setLoading(false)
-            alert('The template data has expired. Please select the template again from the list.')
-          return
+    useEffect(() => {
+        if (isLoaded && editorId) {
+            const editorConfig = getEditor(editorId)
+            if (editorConfig) {
+                setEditor(editorConfig)
+            }
         }
-        
-        setTemplate(storedTemplate)
-        setHtmlContent('') // Initialize with empty content
-        setLoading(false)
-      } catch (err) {
-        console.error('Failed to parse stored template:', err)
-        setLoading(false)
-      }
-    } else {
-      setLoading(false)
+    }, [isLoaded, editorId, getEditor])
+
+    useEffect(() => {
+        if (!templateId) {
+            setLoading(false)
+            return
+        }
+
+        const storedData = localStorage.getItem(`template-${templateId}`)
+        if (storedData) {
+            try {
+                const { expiry, template: storedTemplate } = JSON.parse(storedData)
+
+                console.log('Loaded template from localStorage:', storedTemplate, 'with expiry:', expiry)
+
+                // Check if expired
+                if (expiry && Date.now() > expiry) {
+                    storedTemplate.htmlContent = '' // Clear HTML content for expired templates
+                    return
+                }
+
+                setTemplate(storedTemplate)
+                setInitialHtmlContent(storedTemplate.htmlContent || '')
+                setVariablesContent(storedTemplate.sampleJsonData || '{}')
+                setLoading(false)
+            } catch (err) {
+                console.error('Failed to parse stored template:', err)
+                setLoading(false)
+            }
+        } else {
+            setLoading(false)
+        }
+    }, [templateId])
+
+    useEffect(() => {
+        if (template) {
+            document.title = `${template.name || 'Untitled'} - Docify Editor`
+        } else {
+            document.title = 'Docify Editor'
+        }
+    }, [template?.name])
+
+    useEffect(() => {
+        setHtmlContent(initialHtmlContent)
+    }, [initialHtmlContent])
+
+    // Fetch HTML content if empty
+    useEffect(() => {
+        if (!template || initialHtmlContent || !editor || !template.refNumber) {
+            return
+        }
+
+        const fetchHtmlContent = async () => {
+            try {
+                const headers: HeadersInit = {}
+                if (editor.credentialsType === 'header') {
+                    editor.credentials.forEach((cred) => {
+                        if (cred.key && cred.value) {
+                            headers[cred.key] = cred.value
+                        }
+                    })
+                }
+
+                let url = `${editor.apiUrl}/templates/preview/${template.refNumber}`
+
+                if (editor.credentialsType === 'query') {
+                    const params = new URLSearchParams()
+                    editor.credentials.forEach((cred) => {
+                        if (cred.key && cred.value) {
+                            params.append(cred.key, cred.value)
+                        }
+                    })
+                    url += `?${params.toString()}`
+                }
+
+                const response = await fetch(url, { headers })
+                if (response.ok) {
+                    const jsonData = await response.json()
+                    if (jsonData.data) {
+                        // Decode base64 HTML
+                        const decodedHtml = atob(jsonData.data)
+                        setInitialHtmlContent(decodedHtml)
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch HTML content:', err)
+            }
+        }
+
+        fetchHtmlContent()
+    }, [template?.id, initialHtmlContent, editor?.apiUrl])
+
+    const handleBack = () => {
+        if (templateId) {
+            localStorage.removeItem(`template-${templateId}`)
+        }
+        router.push(`/docify?editorId=${editorId}`)
     }
-  }, [templateId])
 
-  const handleBack = () => {
-    if (templateId) {
-      localStorage.removeItem(`template-${templateId}`)
+    const getTemplateName = (): string => {
+        if (!template) return 'Unknown Template'
+        return template.name || template.fileName || 'Untitled'
     }
-    router.push(`/docify?editorId=${editorId}`)
-  }
 
-  const getTemplateName = (): string => {
-    if (!template) return 'Unknown Template'
-    return template.name || template.fileName || 'Untitled'
-  }
+    const handleEditorChange = (value: string) => {
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('editor', value)
+        router.push(`?${params.toString()}`, { scroll: false })
+    }
 
-  const handleEditorChange = (value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('editor', value)
-    router.push(`?${params.toString()}`, { scroll: false })
-  }
+    const handleHtmlChange = useCallback((value: string) => {
+        setHtmlContent(value)
+    }, [])
 
-  const handleHtmlChange = useCallback((value: string) => {
-    setHtmlContent(value)
-  }, [])
+    const handleVariablesChange = useCallback((value: string) => {
+        setVariablesContent(value)
+    }, [])
 
-  const handleVariablesChange = useCallback((value: string) => {
-    setVariablesContent(value)
-  }, [])
+    if (loading) {
+        return (
+            <main className="min-h-screen bg-background">
+                <div className="mx-auto max-w-7xl px-4 py-8">
+                    <p className="text-muted-foreground">Loading template...</p>
+                </div>
+            </main>
+        )
+    }
 
-  if (loading) {
+    if (!template) {
+        return (
+            <main className="min-h-screen bg-background">
+                <div className="mx-auto max-w-7xl px-4 py-8">
+                    <p className="text-destructive">Template not found. Please select a template from the list.</p>
+                    <Button onClick={handleBack} className="mt-4">
+                        Back to Templates
+                    </Button>
+                </div>
+            </main>
+        )
+    }
+
     return (
-      <main className="min-h-screen bg-background">
-        <div className="mx-auto max-w-7xl px-4 py-8">
-          <p className="text-muted-foreground">Loading template...</p>
-        </div>
-      </main>
-    )
-  }
-
-  if (!template) {
-    return (
-      <main className="min-h-screen bg-background">
-        <div className="mx-auto max-w-7xl px-4 py-8">
-          <p className="text-destructive">Template not found. Please select a template from the list.</p>
-          <Button onClick={handleBack} className="mt-4">
-            Back to Templates
-          </Button>
-        </div>
-      </main>
-    )
-  }
-
-  return (
-    <main className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <div className="border-b border-border p-2">
-        <div className="mx-aut flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/">
-              <Button variant="ghost" size="icon" className="h-10 w-10">
-                <Home className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Button variant="ghost" size="icon" onClick={handleBack} className="h-10 w-10">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold">{getTemplateName()}</h1>
-              <p className="text-xs text-muted-foreground">{template.refNumber || 'No reference'}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant={previewMode === 'html' ? 'default' : 'outline'} onClick={() => setPreviewMode('html')}>
-              HTML
-            </Button>
-            <Button variant={previewMode === 'pdf' ? 'default' : 'outline'} onClick={() => setPreviewMode('pdf')}>
-              PDF
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Editor Section */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar with Tabs */}
-        <Tabs
-          value={currentEditor}
-          onValueChange={handleEditorChange}
-          orientation="vertical"
-          className="w-full bg-muted border-r border-border"
-        >
-          <TabsList variant="default" className="flex-col items-center h-full w-12 p-2 gap-4 bg-muted border-0 rounded-none">
-            <TabsTrigger value="code" title="Code View" className="w-full cursor-pointer hover:bg-accent">
-              <Code className="h-10 w-10" />
-            </TabsTrigger>
-            <TabsTrigger value="variables" title="Variables" className="w-full cursor-pointer hover:bg-accent">
-              <Variable className="h-10 w-10" />
-            </TabsTrigger>
-            <TabsTrigger value="settings" title="Settings" className="w-full cursor-pointer hover:bg-accent">
-              <Settings className="h-10 w-10" />
-            </TabsTrigger>
-          </TabsList>
-
-          <ResizablePanelGroup orientation="horizontal" className="flex-1 w-full">
-            <ResizablePanel defaultSize={50} minSize={30}>
-              <TabsContent value="code" className="flex-1 flex-col overflow-hidden flex h-full">
-                <HtmlEditor
-                  htmlContent={htmlContent}
-                  onHtmlChange={handleHtmlChange}
-                  zoom={zoom}
-                />
-              </TabsContent>
-              <TabsContent value="variables" className="flex-1 flex-col overflow-hidden flex h-full">
-                <VariableEditor
-                  variablesContent={variablesContent}
-                  onVariablesChange={handleVariablesChange}
-                  zoom={zoom}
-                />
-              </TabsContent>
-              <TabsContent value="settings" className="flex-1 flex-col overflow-hidden flex h-full">
-                <SettingsEditor />
-              </TabsContent>
-            </ResizablePanel>
-
-            <ResizableHandle />
-
-            <ResizablePanel defaultSize={50} minSize={30} className="flex flex-col border-l border-border">
-              <div className="bg-muted/50 px-4 py-2 border-b border-border">
-                <p className="text-xs font-medium text-muted-foreground">Live Preview</p>
-              </div>
-              <div className="flex-1 overflow-auto bg-white">
-                {previewMode === 'html' ? (
-                  htmlContent ? (
-                    <iframe
-                      title="Preview"
-                      srcDoc={htmlContent}
-                      className="w-full h-full border-0"
-                      sandbox="allow-scripts"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-muted-foreground">Enter HTML to see preview</p>
+        <main className="min-h-screen bg-background flex flex-col">
+            {/* Header */}
+            <div className="border-b border-border p-2">
+                <div className="mx-aut flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <Link href="/">
+                            <Button variant="ghost" size="icon" className="h-10 w-10">
+                                <Home className="h-4 w-4" />
+                            </Button>
+                        </Link>
+                        <Button variant="ghost" size="icon" onClick={handleBack} className="h-10 w-10">
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <div>
+                            <h1 className="text-xl font-semibold">{getTemplateName()}</h1>
+                            <p className="text-xs text-muted-foreground">{template.refNumber || 'No reference'}</p>
+                        </div>
                     </div>
-                  )
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-muted-foreground">PDF preview would render here</p>
-                  </div>
-                )}
-              </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </Tabs>
-      </div>
-    </main>
-  )
+                </div>
+            </div>
+
+            {/* Editor Section */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Sidebar with Tabs */}
+                <Tabs
+                    value={currentEditor}
+                    onValueChange={handleEditorChange}
+                    orientation="vertical"
+                    className="w-full bg-muted border-r border-border"
+                >
+                    <TabsList variant="default" className="flex-col items-center h-full w-12 p-2 gap-4 bg-muted border-0 rounded-none">
+                        <TabsTrigger value="code" title="Code View" className="w-full cursor-pointer hover:bg-accent">
+                            <Code className="h-10 w-10" />
+                        </TabsTrigger>
+                        <TabsTrigger value="variables" title="Variables" className="w-full cursor-pointer hover:bg-accent">
+                            <Variable className="h-10 w-10" />
+                        </TabsTrigger>
+                        <TabsTrigger value="settings" title="Settings" className="w-full cursor-pointer hover:bg-accent">
+                            <Settings className="h-10 w-10" />
+                        </TabsTrigger>
+                    </TabsList>
+
+                    <ResizablePanelGroup orientation="horizontal" className="flex-1 w-full">
+                        <ResizablePanel defaultSize={50} minSize={30}>
+                            <TabsContent value="code" className="flex-1 flex-col overflow-hidden flex h-full">
+                                <HtmlEditor
+                                    htmlContent={htmlContent}
+                                    onHtmlChange={handleHtmlChange}
+                                    zoom={zoom}
+                                />
+                            </TabsContent>
+                            <TabsContent value="variables" className="flex-1 flex-col overflow-hidden flex h-full">
+                                <VariableEditor
+                                    variablesContent={variablesContent}
+                                    onVariablesChange={handleVariablesChange}
+                                    zoom={zoom}
+                                />
+                            </TabsContent>
+                            <TabsContent value="settings" className="flex-1 flex-col overflow-hidden flex h-full">
+                                <SettingsEditor />
+                            </TabsContent>
+                        </ResizablePanel>
+
+                        <ResizableHandle />
+
+                        <ResizablePanel defaultSize={50} minSize={30} className="flex flex-col border-l border-border">
+                            <div className="bg-muted/50 px-4 py-2 border-b border-border flex items-center justify-between">
+                                <p className="text-xs font-medium text-muted-foreground">Live Preview</p>
+                                <div className="flex items-center gap-2">
+                                    <Button variant={previewMode === 'html' ? 'default' : 'outline'} size="sm" onClick={() => setPreviewMode('html')}>
+                                        HTML
+                                    </Button>
+                                    <Button variant={previewMode === 'pdf' ? 'default' : 'outline'} size="sm" onClick={() => setPreviewMode('pdf')}>
+                                        PDF
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="flex-1 overflow-auto bg-white">
+                                {previewMode === 'html' ? (
+                                    htmlContent ? (
+                                        <iframe
+                                            title="Preview"
+                                            srcDoc={htmlContent}
+                                            className="w-full h-full border-0"
+                                            sandbox="allow-scripts"
+                                        />
+                                    ) : (
+                                        <div className="flex items-center justify-center h-full">
+                                            <p className="text-muted-foreground">Enter HTML to see preview</p>
+                                        </div>
+                                    )
+                                ) : (
+                                    <div className="flex items-center justify-center h-full">
+                                        <p className="text-muted-foreground">PDF preview would render here</p>
+                                    </div>
+                                )}
+                            </div>
+                        </ResizablePanel>
+                    </ResizablePanelGroup>
+                </Tabs>
+            </div>
+        </main>
+    )
 }
