@@ -13,6 +13,11 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@/components/ui/resizable'
+import {
   ChevronLeft,
   Mail,
   MessageSquare,
@@ -20,6 +25,9 @@ import {
   ZoomOut,
   RefreshCw,
   Save,
+  Monitor,
+  Tablet,
+  Smartphone,
 } from 'lucide-react'
 
 interface NotificationTemplate {
@@ -50,6 +58,7 @@ export default function NotifyEditorPage() {
   const [smsContent, setSmsContent] = useState('')
   const [loading, setLoading] = useState(true)
   const [zoom, setZoom] = useState(100)
+  const [deviceView, setDeviceView] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
 
   useEffect(() => {
     if (!templateId) {
@@ -129,6 +138,29 @@ export default function NotifyEditorPage() {
     )
   }
 
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto max-w-7xl px-4 py-8">
+          <p className="text-muted-foreground">Loading template...</p>
+        </div>
+      </main>
+    )
+  }
+
+  if (!template) {
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto max-w-7xl px-4 py-8">
+          <p className="text-destructive">Template not found. Please select a template from the list.</p>
+          <Button onClick={handleBack} className="mt-4">
+            Back to Templates
+          </Button>
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -151,7 +183,7 @@ export default function NotifyEditorPage() {
           value={currentEditor}
           onValueChange={handleEditorChange}
           orientation="vertical"
-          className="w-auto bg-muted border-r border-border"
+          className="w-full bg-muted border-r border-border"
         >
           <TabsList variant="default" className="flex-col items-center h-full w-12 p-2 gap-4 bg-muted border-0 rounded-none">
             <TabsTrigger value="email" title="Email Editor" className="w-full cursor-pointer hover:bg-accent">
@@ -162,69 +194,116 @@ export default function NotifyEditorPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="email" className="flex-1 flex-col overflow-hidden flex">
-            <EmailEditor
-              emailContent={emailContent}
-              onEmailChange={handleEmailChange}
-              zoom={zoom}
-            />
-          </TabsContent>
+          <ResizablePanelGroup orientation="horizontal" className="flex-1 w-full">
+            <ResizablePanel defaultSize={60} minSize={30}>
+              <TabsContent value="email" className="flex-1 flex-col overflow-hidden flex h-full w-full">
+                <EmailEditor
+                  emailContent={emailContent}
+                  onEmailChange={handleEmailChange}
+                  zoom={zoom}
+                />
+              </TabsContent>
 
-          <TabsContent value="sms" className="flex-1 flex-col overflow-hidden flex">
-            <SmsEditor
-              smsContent={smsContent}
-              onSmsChange={handleSmsChange}
-              zoom={zoom}
-            />
-          </TabsContent>
-        </Tabs>
+              <TabsContent value="sms" className="flex-1 flex-col overflow-hidden flex h-full w-full">
+                <SmsEditor
+                  smsContent={smsContent}
+                  onSmsChange={handleSmsChange}
+                  zoom={zoom}
+                />
+              </TabsContent>
+            </ResizablePanel>
 
-        {/* Right: Live Preview */}
-        <div className="flex-1 flex flex-col border-l border-border">
-          <div className="bg-muted/50 px-4 py-2 border-b border-border">
-            <p className="text-xs font-medium text-muted-foreground">
-              {currentEditor === 'email' ? 'Email Preview' : 'SMS Preview'}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {currentEditor === 'email' ? 'Live preview of your email template' : 'How your SMS will appear on mobile devices'}
-            </p>
-          </div>
+            <ResizableHandle />
 
-          <div className="flex-1 overflow-auto">
-            {currentEditor === 'email' ? (
-              emailContent ? (
-                <div className="bg-white p-4">
-                  <iframe
-                    title="Email Preview"
-                    srcDoc={emailContent}
-                    className="w-full border-0"
-                    style={{ minHeight: '400px' }}
-                    sandbox="allow-scripts"
-                  />
+            <ResizablePanel defaultSize={40} minSize={30} className="flex flex-col border-l border-border w-full">
+              <div className="bg-muted/50 px-4 py-2 border-b border-border flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {currentEditor === 'email' ? 'Email Preview' : 'SMS Preview'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {currentEditor === 'email' ? 'Live preview of your email template' : 'How your SMS will appear on mobile devices'}
+                  </p>
                 </div>
-              ) : (
-                <div className="flex items-center justify-center h-full bg-gray-50">
-                  <p className="text-muted-foreground">Enter HTML to see email preview</p>
-                </div>
-              )
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center bg-white p-8">
-                <div className="w-full max-w-sm">
-                  <div className="flex flex-col items-end">
-                    <div className="bg-gray-200 rounded-3xl rounded-tr-none px-4 py-2 max-w-xs">
-                      <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
-                        {smsContent || 'SMS preview will appear here'}
-                      </p>
+                {currentEditor === 'email' && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant={deviceView === 'desktop' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setDeviceView('desktop')}
+                      title="Desktop View"
+                    >
+                      <Monitor className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={deviceView === 'tablet' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setDeviceView('tablet')}
+                      title="Tablet View"
+                    >
+                      <Tablet className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={deviceView === 'mobile' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setDeviceView('mobile')}
+                      title="Mobile View"
+                    >
+                      <Smartphone className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-50 p-4">
+                {currentEditor === 'email' ? (
+                  emailContent ? (
+                    <div
+                      className="bg-white rounded-lg shadow-lg overflow-hidden"
+                      style={{
+                        width:
+                          deviceView === 'desktop'
+                            ? '100%'
+                            : deviceView === 'tablet'
+                              ? '768px'
+                              : '375px',
+                        maxWidth: '100%',
+                      }}
+                    >
+                      <iframe
+                        title="Email Preview"
+                        srcDoc={emailContent}
+                        className="w-full border-0 h-full"
+                        style={{ minHeight: '600px' }}
+                        sandbox="allow-scripts"
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <p className="text-muted-foreground">Enter HTML to see email preview</p>
+                    </div>
+                  )
+                ) : (
+                  <div className="w-full max-w-sm">
+                    <div className="flex flex-col items-end">
+                      <div className="bg-gray-200 rounded-3xl rounded-tr-none px-4 py-2 max-w-xs">
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
+                          {smsContent || 'SMS preview will appear here'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 text-xs text-gray-500 text-right">
+                      {smsContent.length} / 160 characters
                     </div>
                   </div>
-                  <div className="mt-4 text-xs text-gray-500 text-right">
-                    {smsContent.length} / 160 characters
-                  </div>
-                </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </Tabs>
       </div>
 
       {/* Floating Toolbar */}

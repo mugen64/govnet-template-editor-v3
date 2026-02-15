@@ -14,6 +14,11 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs'
 import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@/components/ui/resizable'
+import {
   ChevronLeft,
   Code,
   Eye,
@@ -186,51 +191,57 @@ export default function DocifyEditorPage() {
               <Settings className="h-10 w-10" />
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="code" className="flex-1 flex-col overflow-hidden flex">
-            <HtmlEditor
-              htmlContent={htmlContent}
-              onHtmlChange={handleHtmlChange}
-              zoom={zoom}
-            />
-          </TabsContent>
-          <TabsContent value="variables" className="flex-1 flex-col overflow-hidden flex">
-            <VariableEditor
-              variablesContent={variablesContent}
-              onVariablesChange={handleVariablesChange}
-              zoom={zoom}
-            />
-          </TabsContent>
-          <TabsContent value="settings" className="flex-1 flex-col overflow-hidden flex">
-            <SettingsEditor />
-          </TabsContent>
-        </Tabs>
 
-        {/* Right: Live Preview */}
-        <div className="flex-1 flex flex-col border-l border-border">
-          <div className="bg-muted/50 px-4 py-2 border-b border-border">
-            <p className="text-xs font-medium text-muted-foreground">Live Preview</p>
-          </div>
-          <div className="flex-1 overflow-auto bg-white">
-            {previewMode === 'html' ? (
-              htmlContent ? (
-                <iframe
-                  title="Preview"
-                  srcDoc={htmlContent}
-                  className="w-full h-full border-0"
-                  sandbox="allow-scripts"
+          <ResizablePanelGroup orientation="horizontal" className="flex-1">
+            <ResizablePanel defaultSize={50} minSize={30}>
+              <TabsContent value="code" className="flex-1 flex-col overflow-hidden flex h-full">
+                <HtmlEditor
+                  htmlContent={htmlContent}
+                  onHtmlChange={handleHtmlChange}
+                  zoom={zoom}
                 />
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-muted-foreground">Enter HTML to see preview</p>
-                </div>
-              )
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">PDF preview would render here</p>
+              </TabsContent>
+              <TabsContent value="variables" className="flex-1 flex-col overflow-hidden flex h-full">
+                <VariableEditor
+                  variablesContent={variablesContent}
+                  onVariablesChange={handleVariablesChange}
+                  zoom={zoom}
+                />
+              </TabsContent>
+              <TabsContent value="settings" className="flex-1 flex-col overflow-hidden flex h-full">
+                <SettingsEditor />
+              </TabsContent>
+            </ResizablePanel>
+
+            <ResizableHandle />
+
+            <ResizablePanel defaultSize={50} minSize={30} className="flex flex-col border-l border-border">
+              <div className="bg-muted/50 px-4 py-2 border-b border-border">
+                <p className="text-xs font-medium text-muted-foreground">Live Preview</p>
               </div>
-            )}
-          </div>
-        </div>
+              <div className="flex-1 overflow-auto bg-white">
+                {previewMode === 'html' ? (
+                  htmlContent ? (
+                    <iframe
+                      title="Preview"
+                      srcDoc={htmlContent}
+                      className="w-full h-full border-0"
+                      sandbox="allow-scripts"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-muted-foreground">Enter HTML to see preview</p>
+                    </div>
+                  )
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-muted-foreground">PDF preview would render here</p>
+                  </div>
+                )}
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </Tabs>
       </div>
     </main>
   )
