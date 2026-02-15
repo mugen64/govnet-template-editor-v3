@@ -13,16 +13,18 @@ export interface SmsEditorProps {
 
 export function SmsEditor({ smsContent, onSmsChange, zoom }: SmsEditorProps) {
   const editorRef = useRef<any>(null)
+  const monacoRef = useRef<any>(null)
   const { resolvedTheme } = useTheme()
 
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor
+    monacoRef.current = monaco
     editor.focus()
   }
 
   useEffect(() => {
-    if (!editorRef.current) return
-    const cleanup = attachEditorKeyboardHandler(editorRef.current, 'text')
+    if (!editorRef.current || !monacoRef.current) return
+    const cleanup = attachEditorKeyboardHandler(editorRef.current, monacoRef.current, 'text')
     return cleanup
   }, [])
 

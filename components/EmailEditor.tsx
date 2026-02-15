@@ -13,16 +13,18 @@ export interface EmailEditorProps {
 
 export function EmailEditor({ emailContent, onEmailChange, zoom }: EmailEditorProps) {
   const editorRef = useRef<any>(null)
+  const monacoRef = useRef<any>(null)
   const { resolvedTheme } = useTheme()
 
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor
+    monacoRef.current = monaco
     editor.focus()
   }
 
   useEffect(() => {
-    if (!editorRef.current) return
-    const cleanup = attachEditorKeyboardHandler(editorRef.current, 'html')
+    if (!editorRef.current || !monacoRef.current) return
+    const cleanup = attachEditorKeyboardHandler(editorRef.current, monacoRef.current, 'html')
     return cleanup
   }, [])
 

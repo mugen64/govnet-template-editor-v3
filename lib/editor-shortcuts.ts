@@ -27,72 +27,53 @@ export function generateCommentBlock(language: EditorLanguage): string {
 }
 
 /**
- * Creates keyboard shortcut handler for editor
- * Ctrl/Cmd + Shift + C: Insert comment block
+ * Attach keyboard shortcuts using Monaco's command API
+ * This prevents interference with normal editor functionality
  */
-export function createEditorShortcutHandler(
+export function attachEditorKeyboardHandler(
   editor: any,
+  monaco: any,
   language: EditorLanguage,
   callbacks?: {
     onCommentInsert?: (comment: string) => void
   }
 ) {
-  return (e: KeyboardEvent) => {
-    // Ctrl/Cmd + Shift + C: Insert comment block
-    if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.code === 'KeyC') {
-      e.preventDefault()
+  if (!editor || !monaco) return
+
+  // Register Ctrl/Cmd + Shift + C: Insert comment block
+  const commandId = `insert-comment-${Math.random().toString(36).substr(2, 9)}`
+  
+  editor.addCommand(
+    isMac ? monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyC : 
+           monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyC,
+    () => {
       const comment = generateCommentBlock(language)
-      
-      // Insert at cursor position
       const position = editor.getPosition()
-      const range = {
-        startLineNumber: position.lineNumber,
-        startColumn: position.column,
-        endLineNumber: position.lineNumber,
-        endColumn: position.column,
-      }
       
       editor.executeEdits('insert-comment', [
         {
-          range,
+          range: new monaco.Range(
+            position.lineNumber,
+            position.column,
+            position.lineNumber,
+            position.column
+          ),
           text: comment,
           forceMoveMarkers: true,
         },
       ])
       
       callbacks?.onCommentInsert?.(comment)
-    }
-
-    // Ctrl/Cmd + Shift + /: Toggle comment for selected lines
-    if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && e.key === '?') {
-      e.preventDefault()
-      // Use Monaco's built-in toggle comment command
-      editor.trigger('keyboard', 'editor.action.commentLine', {})
-    }
-  }
-}
-
-/**
- * Attach keyboard event listener to editor
- */
-export function attachEditorKeyboardHandler(
-  editor: any,
-  language: EditorLanguage,
-  callbacks?: {
-    onCommentInsert?: (comment: string) => void
-  }
-) {
-  if (!editor) return
-
-  const handler = createEditorShortcutHandler(editor, language, callbacks)
-  const domNode = editor.getDomNode()
-
-  if (domNode) {
-    domNode.addEventListener('keydown', handler)
-    
-    // Return cleanup function
-    return () => {
-      domNode.removeEventListener('keydown', handler)
+    },
+    commandId
+  )
+  
+  // Return cleanup function
+  return () => {
+    try {
+      editor.removeCommand(commandId)
+    } catch (e) {
+      // Ignore cleanup errors
     }
   }
 }
