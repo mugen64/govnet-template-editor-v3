@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useEditorStorage } from '@/hooks/useEditorStorage'
 import { DocifyEditorHeader } from '@/components/DocifyEditorHeader'
 import { DocifyEditorTabs } from '@/components/DocifyEditorTabs'
+import { extractGoTemplateVariables, mergeVariablesWithJson } from '@/lib/extract-template-variables'
 import type { EditorConfig } from '@/lib/editor-types'
 
 interface PdfTemplate {
@@ -103,6 +104,20 @@ export default function DocifyEditorPage() {
         setHtmlContent(initialHtmlContent)
     }, [initialHtmlContent])
 
+    // Extract variables from HTML content and merge with existing variables
+    useEffect(() => {
+        if (!initialHtmlContent) {
+            return
+        }
+
+        const extractedVariables = extractGoTemplateVariables(initialHtmlContent)
+        if (extractedVariables.length > 0) {
+            setVariablesContent((prevVariables) => {
+                return mergeVariablesWithJson(prevVariables, extractedVariables)
+            })
+        }
+    }, [initialHtmlContent])
+
     // Fetch HTML content from API if empty
     useEffect(() => {
         if (!template || initialHtmlContent || !editor || !template.refNumber) {
@@ -177,6 +192,54 @@ export default function DocifyEditorPage() {
     const handleVariablesChange = useCallback((value: string) => {
         setVariablesContent(value)
     }, [])
+
+    // Sync HTML content to localStorage
+    useEffect(() => {
+        if (!template || !templateId || isLoadingTemplate || isLoadingHtml) {
+            return
+        }
+
+        const storedData = localStorage.getItem(`template-${templateId}`)
+        if (storedData) {
+            try {
+                const { expiry, template: storedTemplate } = JSON.parse(storedData)
+                const updatedData = {
+                    expiry,
+                    template: {
+                        ...storedTemplate,
+                        htmlContent: htmlContent,
+                    },
+                }
+                localStorage.setItem(`template-${templateId}`, JSON.stringify(updatedData))
+            } catch (err) {
+                console.error('Failed to sync HTML to localStorage:', err)
+            }
+        }
+    }, [htmlContent, templateId, template, isLoadingTemplate, isLoadingHtml])
+
+    // Sync variables content to localStorage
+    useEffect(() => {
+        if (!template || !templateId || isLoadingTemplate) {
+            return
+        }
+
+        const storedData = localStorage.getItem(`template-${templateId}`)
+        if (storedData) {
+            try {
+                const { expiry, template: storedTemplate } = JSON.parse(storedData)
+                const updatedData = {
+                    expiry,
+                    template: {
+                        ...storedTemplate,
+                        sampleJsonData: variablesContent,
+                    },
+                }
+                localStorage.setItem(`template-${templateId}`, JSON.stringify(updatedData))
+            } catch (err) {
+                console.error('Failed to sync variables to localStorage:', err)
+            }
+        }
+    }, [variablesContent, templateId, template, isLoadingTemplate])
 
     if (isLoadingTemplate || isLoadingHtml) {
         return (

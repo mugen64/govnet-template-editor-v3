@@ -116,6 +116,54 @@ export default function NotifyEditorPage() {
     setSmsContent(value)
   }, [])
 
+  // Sync email content to localStorage
+  useEffect(() => {
+    if (!template || !templateId || loading) {
+      return
+    }
+
+    const storedData = localStorage.getItem(`template-${templateId}`)
+    if (storedData) {
+      try {
+        const { expiry, template: storedTemplate } = JSON.parse(storedData)
+        const updatedData = {
+          expiry,
+          template: {
+            ...storedTemplate,
+            email: emailContent,
+          },
+        }
+        localStorage.setItem(`template-${templateId}`, JSON.stringify(updatedData))
+      } catch (err) {
+        console.error('Failed to sync email to localStorage:', err)
+      }
+    }
+  }, [emailContent, templateId, template, loading])
+
+  // Sync SMS content to localStorage
+  useEffect(() => {
+    if (!template || !templateId || loading) {
+      return
+    }
+
+    const storedData = localStorage.getItem(`template-${templateId}`)
+    if (storedData) {
+      try {
+        const { expiry, template: storedTemplate } = JSON.parse(storedData)
+        const updatedData = {
+          expiry,
+          template: {
+            ...storedTemplate,
+            sms: smsContent,
+          },
+        }
+        localStorage.setItem(`template-${templateId}`, JSON.stringify(updatedData))
+      } catch (err) {
+        console.error('Failed to sync SMS to localStorage:', err)
+      }
+    }
+  }, [smsContent, templateId, template, loading])
+
   if (loading) {
     return (
       <main className="min-h-screen bg-background">
