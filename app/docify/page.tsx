@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
@@ -62,6 +63,7 @@ interface TemplatesResponse {
 const ITEMS_PER_PAGE = 6
 
 export default function DocifyPage() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const editorId = searchParams.get('editorId')
   const { getEditor, isLoaded } = useEditorStorage()
@@ -240,6 +242,16 @@ export default function DocifyPage() {
 
   const handleNextPage = () => {
     setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+  }
+
+  const handleTemplateClick = (template: PdfTemplate) => {
+    const expiry = Date.now() + 24 * 60 * 60 * 1000 // 24 hours from now
+    const data = {
+      expiry,
+      template,
+    }
+    localStorage.setItem(`template-${template.id}`, JSON.stringify(data))
+    router.push(`/docify/editor?editorId=${editorId}&templateId=${template.id}`)
   }
 
   const handleCreateTemplate = async () => {
@@ -465,6 +477,7 @@ export default function DocifyPage() {
                   <Card
                     key={template.id}
                     className="cursor-pointer transition-all hover:shadow-md hover:ring-2 hover:ring-ring/50"
+                    onClick={() => handleTemplateClick(template)}
                   >
                     <CardHeader>
                       <div className="space-y-2">
