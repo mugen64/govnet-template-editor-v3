@@ -1,0 +1,235 @@
+'use client'
+
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Plus, Trash2 } from 'lucide-react'
+import type { EditorConfig, EditorType, SyncMode, CredentialLocation } from '@/lib/editor-types'
+import { toast } from 'sonner'
+
+interface AddEditorFormProps {
+  onSave: (editor: EditorConfig) => void
+  onCancel: () => void
+}
+
+export function AddEditorForm({ onSave, onCancel }: AddEditorFormProps) {
+  const [name, setName] = useState('')
+  const [type, setType] = useState<EditorType>('notification')
+  const [syncMode, setSyncMode] = useState<SyncMode>('online')
+  const [apiUrl, setApiUrl] = useState('')
+  const [credentialLocation, setCredentialLocation] = useState<CredentialLocation>('header')
+  const [credentials, setCredentials] = useState<Array<{ key: string; value: string }>>([
+    { key: '', value: '' },
+  ])
+
+  const handleAddCredential = () => {
+    setCredentials([...credentials, { key: '', value: '' }])
+  }
+
+  const handleRemoveCredential = (index: number) => {
+    setCredentials(credentials.filter((_, i) => i !== index))
+  }
+
+  const handleCredentialChange = (
+    index: number,
+    field: 'key' | 'value',
+    value: string
+  ) => {
+    setCredentials((prev) =>
+      prev.map((cred, i) => (i === index ? { ...cred, [field]: value } : cred))
+    )
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!name.trim()) {
+      toast.error('Editor name is required')
+      return
+    }
+
+    if (!apiUrl.trim() && syncMode === 'online') {
+      toast.error('API URL is required for online mode')
+      return
+    }
+
+    const validCredentials = credentials.filter((c) => c.key.trim())
+
+    const editor: EditorConfig = {
+      id: `editor-${Date.now()}`,
+      name: name.trim(),
+      type,
+      syncMode,
+      apiUrl: apiUrl.trim(),
+      credentialLocation,
+      credentials: validCredentials,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    onSave(editor)
+    toast.success(`Editor "${name}" created successfully`)
+  }
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle>Create New Editor</CardTitle>
+        <CardDescription>
+          Set up a new template editor with your API configuration
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="editor-name">Editor Name</Label>
+              <Input
+                id="editor-name"
+                placeholder="My Notification Editor"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="editor-type">Editor Type</Label>
+              <Select value={type} onValueChange={(value) => setType(value as EditorType)}>
+                <SelectTrigger id="editor-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="notification">Notification</SelectItem>
+                  <SelectItem value="pdf">PDF</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="sync-mode">Sync Mode</Label>
+              <Select value={syncMode} onValueChange={(value) => setSyncMode(value as SyncMode)}>
+                <SelectTrigger id="sync-mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="online">Online Only</SelectItem>
+                  <SelectItem value="local">Local Drive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {syncMode === 'online' && (
+              <div className="space-y-2">
+                <Label htmlFor="api-url">API URL</Label>
+                <Input
+                  id="api-url"
+                  placeholder="https://api.example.com"
+                  value={apiUrl}
+                  onChange={(e) => setApiUrl(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          {syncMode === 'online' && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="credential-location">Credentials Location</Label>
+                <Select
+                  value={credentialLocation}
+                  onValueChange={(value) =>
+                    setCredentialLocation(value as CredentialLocation)
+                  }
+                >
+                  <SelectTrigger id="credential-location">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="header">Request Header</SelectItem>
+                    <SelectItem value="query">Query Parameter</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label>Credentials</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddCredential}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Credential
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  {credentials.map((cred, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        placeholder="Key (e.g., Authorization)"
+                        value={cred.key}
+                        onChange={(e) =>
+                          handleCredentialChange(index, 'key', e.target.value)
+                        }
+                        className="flex-1"
+                      />
+                      <Input
+                        placeholder="Value (e.g., Bearer token...)"
+                        type="password"
+                        value={cred.value}
+                        onChange={(e) =>
+                          handleCredentialChange(index, 'value', e.target.value)
+                        }
+                        className="flex-1"
+                      />
+                      {credentials.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveCredential(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="flex gap-3 pt-4">
+            <Button type="submit" className="flex-1">
+              Create Editor
+            </Button>
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
