@@ -8,6 +8,8 @@ import { useTemplateSync } from '@/hooks/useTemplateSync'
 import { DocifyEditorHeader } from '../../../components/DocifyEditorHeader'
 import { DocifyEditorTabs } from '@/components/DocifyEditorTabs'
 import { extractGoTemplateVariables, mergeVariablesWithJson } from '@/lib/extract-template-variables'
+import { updateDocifyTemplate, updateDocifyTemplateVariable } from '@/lib/editor-api'
+import { toast } from 'sonner'
 import type { EditorConfig } from '@/lib/editor-types'
 
 interface PdfTemplate {
@@ -38,7 +40,7 @@ export default function DocifyEditorPage() {
     const currentEditor = searchParams.get('editor') || 'code'
 
     const { getEditor, isLoaded: editorStorageLoaded } = useEditorStorage()
-    const { syncStatus, triggerSync } = useTemplateSync()
+    const { syncStatus, triggerSync, autoSyncEnabled, setAutoSyncEnabled } = useTemplateSync()
 
     const [editor, setEditor] = useState<EditorConfig | null>(null)
     const [template, setTemplate] = useState<PdfTemplate | null>(null)
@@ -194,12 +196,61 @@ export default function DocifyEditorPage() {
         setVariablesContent(value)
     }, [])
 
+    const handlePushHtml = useCallback(async () => {
+        if (!editor || !template) {
+            toast.error('Editor or template not ready')
+            return
+        }
+
+        try {
+            await updateDocifyTemplate(
+                {
+                    templateId: template.id,
+                    data: {
+                        ...template,
+                        htmlContent,
+                    },
+                },
+                editor
+            )
+            toast.success('HTML pushed successfully')
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to push HTML'
+            toast.error(message)
+        }
+    }, [editor, template, htmlContent])
+
+    const handleSyncMetadata = useCallback(async () => {
+        if (!editor || !template) {
+            toast.error('Editor or template not ready')
+            return
+        }
+
+        try {
+            await updateDocifyTemplateVariable(
+                {
+                    templateId: template.id,
+                    data: {
+                        ...template,
+                        sampleJsonData: variablesContent,
+                    },
+                },
+                editor
+            )
+            toast.success('Metadata synced successfully')
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to sync metadata'
+            toast.error(message)
+        }
+    }, [editor, template, variablesContent])
+
     // Sync HTML content to localStorage
     useEffect(() => {
         if (!template || !templateId || isLoadingTemplate || isLoadingHtml) {
             return
         }
 
+        console.log('Syncing HTML content to localStorage for template:', templateId)
         const storedData = localStorage.getItem(`template-${templateId}`)
         if (storedData) {
             try {
@@ -210,8 +261,10 @@ export default function DocifyEditorPage() {
                     template: {
                         ...storedTemplate,
                         htmlContent: htmlContent,
+                        sampleJsonData: variablesContent,
                     },
                 }
+                console.log('Updated template data to be stored:', updatedData)
                 localStorage.setItem(`template-${templateId}`, JSON.stringify(updatedData))
             } catch (err) {
                 console.error('Failed to sync HTML to localStorage:', err)
@@ -220,29 +273,29 @@ export default function DocifyEditorPage() {
     }, [htmlContent, templateId, template, isLoadingTemplate, isLoadingHtml])
 
     // Sync variables content to localStorage
-    useEffect(() => {
-        if (!template || !templateId || isLoadingTemplate) {
-            return
-        }
+    // useEffect(() => {
+    //     if (!template || !templateId || isLoadingTemplate) {
+    //         return
+    //     }
 
-        const storedData = localStorage.getItem(`template-${templateId}`)
-        if (storedData) {
-            try {
-                const { expiry, template: storedTemplate, ...rest } = JSON.parse(storedData)
-                const updatedData = {
-                    ...rest,
-                    expiry,
-                    template: {
-                        ...storedTemplate,
-                        sampleJsonData: variablesContent,
-                    },
-                }
-                localStorage.setItem(`template-${templateId}`, JSON.stringify(updatedData))
-            } catch (err) {
-                console.error('Failed to sync variables to localStorage:', err)
-            }
-        }
-    }, [variablesContent, templateId, template, isLoadingTemplate])
+    //     const storedData = localStorage.getItem(`template-${templateId}`)
+    //     if (storedData) {
+    //         try {
+    //             const { expiry, template: storedTemplate, ...rest } = JSON.parse(storedData)
+    //             const updatedData = {
+    //                 ...rest,
+    //                 expiry,
+    //                 template: {
+    //                     ...storedTemplate,
+    //                     sampleJsonData: variablesContent,
+    //                 },
+    //             }
+    //             localStorage.setItem(`template-${templateId}`, JSON.stringify(updatedData))
+    //         } catch (err) {
+    //             console.error('Failed to sync variables to localStorage:', err)
+    //         }
+    //     }
+    // }, [variablesContent, templateId, template, isLoadingTemplate])
 
     if (isLoadingTemplate || isLoadingHtml) {
         return (
@@ -275,6 +328,8 @@ export default function DocifyEditorPage() {
                 onBack={handleBack}
                 syncStatus={syncStatus}
                 onSync={() => triggerSync({ source: 'manual' })}
+                autoSyncEnabled={autoSyncEnabled}
+                onAutoSyncToggle={() => setAutoSyncEnabled(!autoSyncEnabled)}
             />
 
             <div className="flex-1 flex overflow-hidden">
@@ -284,6 +339,12 @@ export default function DocifyEditorPage() {
                     variablesContent={variablesContent}
                     previewMode={previewMode}
                     zoom={zoom}
+                    apiUrl={editor?.apiUrl || ''}
+                    templateName={getTemplateName()}
+                    description={template.fileName || template.name || ''}
+                    sampleData={variablesContent}
+                    onPushHtml={handlePushHtml}
+                    onSyncMetadata={handleSyncMetadata}
                     onEditorChange={handleEditorChange}
                     onHtmlChange={handleHtmlChange}
                     onVariablesChange={handleVariablesChange}

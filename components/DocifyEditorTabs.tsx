@@ -21,6 +21,12 @@ interface DocifyEditorTabsProps {
     variablesContent: string
     previewMode: 'html' | 'pdf'
     zoom: number
+    apiUrl: string
+    templateName: string
+    description: string
+    sampleData: string
+    onPushHtml: () => void
+    onSyncMetadata: () => void
     onEditorChange: (value: string) => void
     onHtmlChange: (value: string) => void
     onVariablesChange: (value: string) => void
@@ -33,6 +39,12 @@ export function DocifyEditorTabs({
     variablesContent,
     previewMode,
     zoom,
+    apiUrl,
+    templateName,
+    description,
+    sampleData,
+    onPushHtml,
+    onSyncMetadata,
     onEditorChange,
     onHtmlChange,
     onVariablesChange,
@@ -79,6 +91,7 @@ export function DocifyEditorTabs({
                             htmlContent={htmlContent}
                             onHtmlChange={onHtmlChange}
                             zoom={zoom}
+                            onPushHtml={onPushHtml}
                         />
                     </TabsContent>
                     <TabsContent
@@ -89,6 +102,7 @@ export function DocifyEditorTabs({
                             variablesContent={variablesContent}
                             onVariablesChange={onVariablesChange}
                             zoom={zoom}
+                            onSyncMetadata={onSyncMetadata}
                         />
                     </TabsContent>
                     <TabsContent
@@ -106,6 +120,10 @@ export function DocifyEditorTabs({
                         htmlContent={htmlContent}
                         previewMode={previewMode}
                         onPreviewModeChange={onPreviewModeChange}
+                        apiUrl={apiUrl}
+                        templateName={templateName}
+                        description={description}
+                        sampleData={sampleData}
                     />
                 </ResizablePanel>
             </ResizablePanelGroup>

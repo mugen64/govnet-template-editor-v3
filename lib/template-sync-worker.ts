@@ -3,17 +3,21 @@
  * Collects all templates from localStorage and prepares them for online sync
  */
 
-interface TemplateData {
+interface TemplateRef {
+  templateId: string
+  name: string
+  editorId: string
+}
+
+interface TemplateFull {
   templateId: string
   data: unknown
-  expiry: number
   type: 'docify' | 'notify'
-  lastModified: string
   editorId: string
 }
 
 interface SyncPayload {
-  templates: TemplateData[]
+  templates: TemplateRef[]
   timestamp: string
   count: number
 }
@@ -22,8 +26,8 @@ interface SyncPayload {
  * Find all templates in localStorage
  * Returns an array of template data ready for syncing
  */
-export function getAllTemplatesFromStorage(): TemplateData[] {
-  const templates: TemplateData[] = []
+export function getAllTemplatesFromStorage(): TemplateRef[] {
+  const templates: TemplateRef[] = []
 
   if (typeof localStorage === 'undefined') {
     console.warn('localStorage is not available. No templates can be retrieved for syncing.')
@@ -41,7 +45,7 @@ export function getAllTemplatesFromStorage(): TemplateData[] {
         const storedData = localStorage.getItem(key)
         
         if (storedData) {
-          const { expiry, template, ...rest } = JSON.parse(storedData)
+          const { template, editorId: storedEditorId } = JSON.parse(storedData)
 
           if (!template) {
             continue
@@ -49,11 +53,12 @@ export function getAllTemplatesFromStorage(): TemplateData[] {
           
           const templateId = key.replace('template-', '')
 
-          // Determine template type based on properties
-          let templateType: 'docify' | 'notify' = 'docify'
-          if (template.email || template.sms) {
-            templateType = 'notify'
-          }
+          const resolvedName =
+            template.name ||
+            template.fileName ||
+            template.key ||
+            template.subject ||
+            templateId
 
           //check if lastOpened is with in the day
           const now = Date.now()
@@ -63,12 +68,9 @@ export function getAllTemplatesFromStorage(): TemplateData[] {
           }
 
           templates.push({
-            ...rest,
             templateId,
-            data: template,
-            expiry,
-            type: templateType,
-            lastModified: new Date().toISOString(),
+            name: resolvedName,
+            editorId: template.editorId || storedEditorId || '',
           })
         }
       } catch (err) {
@@ -98,18 +100,22 @@ export function prepareSyncPayload(): SyncPayload {
 /**
  * Get templates by type
  */
-export function getTemplatesByType(type: 'docify' | 'notify'): TemplateData[] {
-  return getAllTemplatesFromStorage().filter((t) => t.type === type)
+export function getTemplatesByType(type: 'docify' | 'notify'): TemplateRef[] {
+  const templates = getAllTemplatesFromStorage()
+  return templates.filter((template) => {
+    const full = getTemplateById(template.templateId)
+    return full?.type === type
+  })
 }
 
 /**
  * Get a specific template by ID
  */
-export function getTemplateById(templateId: string): TemplateData | null {
+export function getTemplateById(templateId: string): TemplateFull | null {
   try {
     const storedData = localStorage.getItem(`template-${templateId}`)
     if (storedData) {
-      const { expiry, template } = JSON.parse(storedData)
+      const { template, editorId: storedEditorId } = JSON.parse(storedData)
       let templateType: 'docify' | 'notify' = 'docify'
       if (template.email || template.sms) {
         templateType = 'notify'
@@ -118,10 +124,8 @@ export function getTemplateById(templateId: string): TemplateData | null {
       return {
         templateId,
         data: template,
-        expiry,
         type: templateType,
-        lastModified: new Date().toISOString(),
-        editorId: template.editorId || '',
+        editorId: template.editorId || storedEditorId || '',
       }
     }
   } catch (err) {
@@ -135,20 +139,14 @@ export function getTemplateById(templateId: string): TemplateData | null {
  * Check if any templates need syncing
  * (Haven't been synced yet or were modified after last sync)
  */
-export function getTemplatesNeedingSync(lastSyncTime: string | null): TemplateData[] {
+export function getTemplatesNeedingSync(lastSyncTime: string | null): TemplateRef[] {
   const templates = getAllTemplatesFromStorage()
 
   if (!lastSyncTime) {
-    // If no last sync time, all templates need syncing
     return templates
   }
 
-  const lastSyncDate = new Date(lastSyncTime).getTime()
-
-  return templates.filter((template) => {
-    const modifiedDate = new Date(template.lastModified).getTime()
-    return modifiedDate > lastSyncDate
-  })
+  return templates
 }
 
 /**

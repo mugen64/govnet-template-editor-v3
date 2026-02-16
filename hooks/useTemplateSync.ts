@@ -8,6 +8,7 @@ import {
     getTemplatesByType,
     getTemplatesNeedingSync,
     clearSyncedTemplates,
+    getTemplateById,
 } from '@/lib/template-sync-worker'
 import { EDITOR_STORAGE_KEY, useEditorStorage } from './useEditorStorage'
 import { EditorConfig } from '@/lib/editor-types'
@@ -27,6 +28,8 @@ interface UseSyncTemplatesReturn {
     triggerSync: (options?: { source?: 'manual' | 'auto' }) => Promise<void>
     getSyncPayload: () => unknown
     getTemplateCount: () => number
+    autoSyncEnabled: boolean
+    setAutoSyncEnabled: (value: boolean) => void
 }
 
 /**
@@ -35,6 +38,7 @@ interface UseSyncTemplatesReturn {
  */
 export function useTemplateSync(): UseSyncTemplatesReturn {
     const { getEditor } = useEditorStorage()
+    const autoSyncStorageKey = 'docify-auto-sync-enabled'
     const [syncStatus, setSyncStatus] = useState<SyncStatus>({
         status: 'idle',
         message: 'Ready to sync',
@@ -43,7 +47,27 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
         syncedTemplates: 0,
         error: null,
     })
+    const [autoSyncEnabled, setAutoSyncEnabled] = useState(true)
     const syncInFlightRef = useRef(false)
+
+    useEffect(() => {
+        try {
+            const storedValue = localStorage.getItem(autoSyncStorageKey)
+            if (storedValue === 'false') {
+                setAutoSyncEnabled(false)
+            }
+        } catch (err) {
+            console.error('Failed to load auto sync preference:', err)
+        }
+    }, [])
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(autoSyncStorageKey, String(autoSyncEnabled))
+        } catch (err) {
+            console.error('Failed to save auto sync preference:', err)
+        }
+    }, [autoSyncEnabled])
 
     // Get total template count
     const getTemplateCount = useCallback(() => {
@@ -110,9 +134,13 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
             }))
 
             for (let index = 0; index < payload.count; index++) {
-                const template = payload.templates[index]
+                const templateRef = payload.templates[index]
                 const editors: EditorConfig[] = JSON.parse(localStorage.getItem(EDITOR_STORAGE_KEY) || '[]')
-                const editor = editors.find((e) => e.id === template.editorId)
+                const template = getTemplateById(templateRef.templateId)
+                if (!template) {
+                    continue
+                }
+                const editor = editors.find((e) => e.id === (template.editorId || templateRef.editorId))
                 if (!editor) {
                     continue
                 }
@@ -142,7 +170,7 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
                     }
 
                     try {
-                        await updateDocifyTemplateVariable(template, editor)
+                        await updateDocifyTemplate(template, editor)
                         setSyncStatus((prev) => ({
                             ...prev,
                             syncedTemplates: prev.syncedTemplates + 1,
@@ -208,17 +236,23 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
     }, [])
 
     useEffect(() => {
+        if (!autoSyncEnabled) {
+            return
+        }
+
         const interval = setInterval(() => {
             void triggerSync({ source: 'auto' })
         }, 30000)
 
         return () => clearInterval(interval)
-    }, [triggerSync])
+    }, [triggerSync, autoSyncEnabled])
 
     return {
         syncStatus,
         triggerSync,
         getSyncPayload,
         getTemplateCount,
+        autoSyncEnabled,
+        setAutoSyncEnabled,
     }
 }

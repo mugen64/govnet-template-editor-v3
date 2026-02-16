@@ -1,20 +1,35 @@
 'use client'
 
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import Editor from '@monaco-editor/react'
 import { useTheme } from 'next-themes'
 import { attachEditorKeyboardHandler } from '@/lib/editor-shortcuts'
+import { Button } from '@/components/ui/button'
+import { Download, Upload } from 'lucide-react'
 
 export interface HtmlEditorProps {
   htmlContent: string
   onHtmlChange: (value: string) => void
   zoom: number
+  onPushHtml?: () => void
 }
 
-export function HtmlEditor({ htmlContent, onHtmlChange, zoom }: HtmlEditorProps) {
+export function HtmlEditor({ htmlContent, onHtmlChange, zoom, onPushHtml }: HtmlEditorProps) {
   const editorRef = useRef<any>(null)
   const monacoRef = useRef<any>(null)
   const { resolvedTheme } = useTheme()
+
+  const handleDownload = useCallback(() => {
+    const blob = new Blob([htmlContent || ''], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'template.html'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  }, [htmlContent])
 
   const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor
@@ -34,8 +49,30 @@ export function HtmlEditor({ htmlContent, onHtmlChange, zoom }: HtmlEditorProps)
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="bg-muted/50 px-4 py-2 border-b border-border">
+      <div className="bg-muted/50 px-4 py-2 border-b border-border flex items-center justify-between">
         <p className="text-xs font-medium text-muted-foreground">HTML Template</p>
+        <div className="flex items-center gap-2">
+          {onPushHtml && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onPushHtml}
+              title="Push HTML"
+              aria-label="Push HTML"
+            >
+              <Upload className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleDownload}
+            title="Download HTML"
+            aria-label="Download HTML"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
       <div className="flex-1 overflow-hidden" style={{ zoom: `${zoom}%` }}>
         <Editor

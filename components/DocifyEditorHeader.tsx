@@ -11,6 +11,8 @@ interface DocifyEditorHeaderProps {
         syncedTemplates: number
     }
     onSync?: () => void
+    autoSyncEnabled?: boolean
+    onAutoSyncToggle?: () => void
 }
 
 export function DocifyEditorHeader({
@@ -19,6 +21,8 @@ export function DocifyEditorHeader({
     onBack,
     syncStatus,
     onSync,
+    autoSyncEnabled,
+    onAutoSyncToggle,
 }: DocifyEditorHeaderProps) {
     const statusText =
         syncStatus?.status === 'idle'
@@ -70,6 +74,16 @@ export function DocifyEditorHeader({
                             <CloudOff className="h-4 w-4 text-red-500" />
                         )}
                         <span className={`text-xs ${statusClass}`}>{statusText}</span>
+                        {typeof autoSyncEnabled === 'boolean' && onAutoSyncToggle && (
+                            <Button
+                                size="sm"
+                                variant={autoSyncEnabled ? 'default' : 'outline'}
+                                onClick={onAutoSyncToggle}
+                                title="Toggle auto sync"
+                            >
+                                Auto Sync {autoSyncEnabled ? 'On' : 'Off'}
+                            </Button>
+                        )}
                         {onSync && (
                             <Button size="sm" variant="outline" onClick={onSync}>
                                 Sync

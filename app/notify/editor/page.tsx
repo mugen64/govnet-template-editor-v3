@@ -59,7 +59,7 @@ export default function NotifyEditorPage() {
   const templateId = searchParams.get('templateId')
   const currentEditor = searchParams.get('editor') || 'email'
 
-  const { syncStatus, triggerSync } = useTemplateSync()
+  const { syncStatus, triggerSync, autoSyncEnabled, setAutoSyncEnabled } = useTemplateSync()
   const statusText =
     syncStatus.status === 'idle'
       ? 'Idle'
@@ -272,9 +272,13 @@ export default function NotifyEditorPage() {
             <span className={`text-xs ${statusClass}`}>{statusText}</span>
             <Button
               size="sm"
-              variant="outline"
-              onClick={() => triggerSync({ source: 'manual' })}
+              variant={autoSyncEnabled ? 'default' : 'outline'}
+              onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
+              title="Toggle auto sync"
             >
+              Auto Sync {autoSyncEnabled ? 'On' : 'Off'}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => triggerSync({ source: 'manual' })}>
               Sync
             </Button>
           </div>
