@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useEditorStorage } from '@/hooks/useEditorStorage'
 import { useTemplateSync } from '@/hooks/useTemplateSync'
-import { DocifyEditorHeader } from '@/components/DocifyEditorHeader'
+import { DocifyEditorHeader } from '../../../components/DocifyEditorHeader'
 import { DocifyEditorTabs } from '@/components/DocifyEditorTabs'
 import { extractGoTemplateVariables, mergeVariablesWithJson } from '@/lib/extract-template-variables'
 import type { EditorConfig } from '@/lib/editor-types'
@@ -72,8 +72,7 @@ export default function DocifyEditorPage() {
             try {
                 const { expiry, template: storedTemplate } = JSON.parse(storedData)
 
-                console.log('Loaded template from localStorage:', storedTemplate, 'with expiry:', expiry)
-
+            
                 // Check if expired
                 if (expiry && Date.now() > expiry) {
                     storedTemplate.htmlContent = '' // Clear HTML content for expired templates
@@ -275,7 +274,7 @@ export default function DocifyEditorPage() {
                 refNumber={template.refNumber}
                 onBack={handleBack}
                 syncStatus={syncStatus}
-                onSync={triggerSync}
+                onSync={() => triggerSync({ source: 'manual' })}
             />
 
             <div className="flex-1 flex overflow-hidden">

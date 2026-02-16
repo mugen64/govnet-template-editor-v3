@@ -60,6 +60,22 @@ export default function NotifyEditorPage() {
   const currentEditor = searchParams.get('editor') || 'email'
 
   const { syncStatus, triggerSync } = useTemplateSync()
+  const statusText =
+    syncStatus.status === 'idle'
+      ? 'Idle'
+      : syncStatus.status === 'syncing'
+        ? 'Syncing...'
+        : syncStatus.status === 'success'
+          ? 'Synced'
+          : 'Failed'
+  const statusClass =
+    syncStatus.status === 'idle'
+      ? 'text-muted-foreground'
+      : syncStatus.status === 'syncing'
+        ? 'text-blue-500'
+        : syncStatus.status === 'success'
+          ? 'text-green-500'
+          : 'text-red-500'
 
   const [template, setTemplate] = useState<NotificationTemplate | null>(null)
   const [emailContent, setEmailContent] = useState('')
@@ -242,35 +258,25 @@ export default function NotifyEditorPage() {
           {/* Sync Status Indicator */}
           <div className="flex items-center gap-2">
             {syncStatus.status === 'idle' && (
-              <>
-                <Cloud className="h-4 w-4 text-muted-foreground" />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={triggerSync}
-                >
-                  Sync
-                </Button>
-              </>
+              <Cloud className="h-4 w-4 text-muted-foreground" />
             )}
             {syncStatus.status === 'syncing' && (
-              <>
-                <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
-                <span className="text-xs text-blue-500">Syncing...</span>
-              </>
+              <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
             )}
             {syncStatus.status === 'success' && (
-              <>
-                <CloudCheck className="h-4 w-4 text-green-500" />
-                <span className="text-xs text-green-500">Synced</span>
-              </>
+              <CloudCheck className="h-4 w-4 text-green-500" />
             )}
             {syncStatus.status === 'error' && (
-              <>
-                <CloudOff className="h-4 w-4 text-red-500" />
-                <span className="text-xs text-red-500">Failed</span>
-              </>
+              <CloudOff className="h-4 w-4 text-red-500" />
             )}
+            <span className={`text-xs ${statusClass}`}>{statusText}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => triggerSync({ source: 'manual' })}
+            >
+              Sync
+            </Button>
           </div>
         </div>
       </div>

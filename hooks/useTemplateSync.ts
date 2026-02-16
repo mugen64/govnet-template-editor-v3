@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { toast } from 'sonner'
 import {
     getAllTemplatesFromStorage,
     prepareSyncPayload,
@@ -23,7 +24,7 @@ interface SyncStatus {
 
 interface UseSyncTemplatesReturn {
     syncStatus: SyncStatus
-    triggerSync: () => Promise<void>
+    triggerSync: (options?: { source?: 'manual' | 'auto' }) => Promise<void>
     getSyncPayload: () => unknown
     getTemplateCount: () => number
 }
@@ -42,15 +43,13 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
         syncedTemplates: 0,
         error: null,
     })
+    const syncInFlightRef = useRef(false)
 
     // Get total template count
     const getTemplateCount = useCallback(() => {
         const templates = getAllTemplatesFromStorage()
-        console.log('Templates found in storage:', templates)
         return templates.length
     }, [])
-
-    console.log('Total templates in storage:', getTemplateCount())
 
 
     // Get sync payload
@@ -60,8 +59,40 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
 
 
     // Trigger sync
-    const triggerSync = useCallback(async () => {
+    const triggerSync = useCallback(async (options?: { source?: 'manual' | 'auto' }) => {
+        const source = options?.source ?? 'manual'
+        if (syncInFlightRef.current) {
+            if (source === 'manual') {
+                toast.info('Sync already running')
+            }
+            return
+        }
+
+        syncInFlightRef.current = true
+        let toastId: string | number | undefined
         try {
+            // Get all templates ready for sync
+            const payload = prepareSyncPayload()
+
+            if (payload.count === 0) {
+                setSyncStatus({
+                    status: 'idle',
+                    message: 'No templates to sync',
+                    progress: 0,
+                    totalTemplates: 0,
+                    syncedTemplates: 0,
+                    error: null,
+                })
+                if (source === 'manual') {
+                    toast.info('No templates to sync')
+                }
+                return
+            }
+
+            toastId = toast.loading(
+                source === 'auto' ? 'Auto-syncing templates...' : 'Syncing templates...'
+            )
+
             setSyncStatus({
                 status: 'syncing',
                 message: 'Preparing templates for sync...',
@@ -70,9 +101,6 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
                 syncedTemplates: 0,
                 error: null,
             })
-
-            // Get all templates ready for sync
-            const payload = prepareSyncPayload()
 
             setSyncStatus((prev) => ({
                 ...prev,
@@ -83,10 +111,8 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
 
             for (let index = 0; index < payload.count; index++) {
                 const template = payload.templates[index]
-                console.log(`editor id ${template.editorId} for template ${template.templateId}`)
                 const editors: EditorConfig[] = JSON.parse(localStorage.getItem(EDITOR_STORAGE_KEY) || '[]')
                 const editor = editors.find((e) => e.id === template.editorId)
-                console.log(`Preparing template ${template.templateId} for sync:`, template, editor)
                 if (!editor) {
                     continue
                 }
@@ -159,6 +185,7 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
                 syncedTemplates: payload.count,
                 error: null,
             })
+            toast.success(`Synced ${payload.count} template(s)`, { id: toastId })
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
             setSyncStatus({
@@ -169,9 +196,24 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
                 syncedTemplates: 0,
                 error: errorMessage,
             })
+            if (toastId) {
+                toast.error(`Sync failed: ${errorMessage}`, { id: toastId })
+            } else {
+                toast.error(`Sync failed: ${errorMessage}`)
+            }
             console.error('Sync error:', err)
+        } finally {
+            syncInFlightRef.current = false
         }
     }, [])
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            void triggerSync({ source: 'auto' })
+        }, 30000)
+
+        return () => clearInterval(interval)
+    }, [triggerSync])
 
     return {
         syncStatus,

@@ -41,7 +41,6 @@ export function useEditorStorage() {
   }
 
   const getEditor = (editorId: string) => {
-    console.log(editors, 'Current editors in storage')
     return editors.find((e) => e.id === editorId)
   }
 
