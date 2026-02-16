@@ -1,7 +1,7 @@
 import { Code, Eye, Settings, Variable } from 'lucide-react'
 import { HtmlEditor } from '@/components/HtmlEditor'
 import { VariableEditor } from '@/components/VariableEditor'
-import { SettingsEditor } from '@/components/SettingsEditor'
+import { SettingsEditor, type PageSettings } from '@/components/SettingsEditor'
 import {
     Tabs,
     TabsContent,
@@ -19,6 +19,7 @@ interface DocifyEditorTabsProps {
     currentEditor: string
     htmlContent: string
     variablesContent: string
+    pageSettings: PageSettings
     previewMode: 'html' | 'pdf'
     zoom: number
     apiUrl: string
@@ -27,6 +28,7 @@ interface DocifyEditorTabsProps {
     sampleData: string
     onPushHtml: () => void
     onSyncMetadata: () => void
+    onPageSettingsChange: (settings: PageSettings) => void
     onEditorChange: (value: string) => void
     onHtmlChange: (value: string) => void
     onVariablesChange: (value: string) => void
@@ -37,6 +39,7 @@ export function DocifyEditorTabs({
     currentEditor,
     htmlContent,
     variablesContent,
+    pageSettings,
     previewMode,
     zoom,
     apiUrl,
@@ -45,6 +48,7 @@ export function DocifyEditorTabs({
     sampleData,
     onPushHtml,
     onSyncMetadata,
+    onPageSettingsChange,
     onEditorChange,
     onHtmlChange,
     onVariablesChange,
@@ -109,7 +113,11 @@ export function DocifyEditorTabs({
                         value="settings"
                         className="flex-1 flex-col overflow-hidden flex h-full"
                     >
-                        <SettingsEditor />
+                        <SettingsEditor
+                            pageSettings={pageSettings}
+                            onPageSettingsChange={onPageSettingsChange}
+                            onSyncMetadata={onSyncMetadata}
+                        />
                     </TabsContent>
                 </ResizablePanel>
 

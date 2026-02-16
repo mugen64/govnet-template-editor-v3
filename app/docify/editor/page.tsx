@@ -11,6 +11,7 @@ import { extractGoTemplateVariables, mergeVariablesWithJson } from '@/lib/extrac
 import { updateDocifyTemplate, updateDocifyTemplateVariable } from '@/lib/editor-api'
 import { toast } from 'sonner'
 import type { EditorConfig } from '@/lib/editor-types'
+import type { PageSettings } from '@/components/SettingsEditor'
 
 interface PdfTemplate {
     id: string
@@ -47,6 +48,7 @@ export default function DocifyEditorPage() {
     const [initialHtmlContent, setInitialHtmlContent] = useState('')
     const [htmlContent, setHtmlContent] = useState('')
     const [variablesContent, setVariablesContent] = useState('{}')
+    const [pageSettings, setPageSettings] = useState<PageSettings>({})
     const [isLoadingTemplate, setIsLoadingTemplate] = useState(true)
     const [isLoadingHtml, setIsLoadingHtml] = useState(false)
     const [previewMode, setPreviewMode] = useState<'html' | 'pdf'>('html')
@@ -85,6 +87,7 @@ export default function DocifyEditorPage() {
                 setTemplate(storedTemplate)
                 setInitialHtmlContent(storedTemplate.htmlContent || '')
                 setVariablesContent(storedTemplate.sampleJsonData || '{}')
+                setPageSettings(storedTemplate.pageSettings || {})
                 setIsLoadingTemplate(false)
             } catch (err) {
                 console.error('Failed to parse stored template:', err)
@@ -196,6 +199,10 @@ export default function DocifyEditorPage() {
         setVariablesContent(value)
     }, [])
 
+    const handlePageSettingsChange = useCallback((settings: PageSettings) => {
+        setPageSettings(settings)
+    }, [])
+
     const handlePushHtml = useCallback(async () => {
         if (!editor || !template) {
             toast.error('Editor or template not ready')
@@ -262,6 +269,7 @@ export default function DocifyEditorPage() {
                         ...storedTemplate,
                         htmlContent: htmlContent,
                         sampleJsonData: variablesContent,
+                        pageSettings,
                     },
                 }
                 console.log('Updated template data to be stored:', updatedData)
@@ -270,32 +278,32 @@ export default function DocifyEditorPage() {
                 console.error('Failed to sync HTML to localStorage:', err)
             }
         }
-    }, [htmlContent, templateId, template, isLoadingTemplate, isLoadingHtml])
+    }, [htmlContent, variablesContent, pageSettings, templateId, template, isLoadingTemplate, isLoadingHtml])
 
     // Sync variables content to localStorage
-    // useEffect(() => {
-    //     if (!template || !templateId || isLoadingTemplate) {
-    //         return
-    //     }
+    useEffect(() => {
+        if (!template || !templateId || isLoadingTemplate) {
+            return
+        }
 
-    //     const storedData = localStorage.getItem(`template-${templateId}`)
-    //     if (storedData) {
-    //         try {
-    //             const { expiry, template: storedTemplate, ...rest } = JSON.parse(storedData)
-    //             const updatedData = {
-    //                 ...rest,
-    //                 expiry,
-    //                 template: {
-    //                     ...storedTemplate,
-    //                     sampleJsonData: variablesContent,
-    //                 },
-    //             }
-    //             localStorage.setItem(`template-${templateId}`, JSON.stringify(updatedData))
-    //         } catch (err) {
-    //             console.error('Failed to sync variables to localStorage:', err)
-    //         }
-    //     }
-    // }, [variablesContent, templateId, template, isLoadingTemplate])
+        const storedData = localStorage.getItem(`template-${templateId}`)
+        if (storedData) {
+            try {
+                const { expiry, template: storedTemplate, ...rest } = JSON.parse(storedData)
+                const updatedData = {
+                    ...rest,
+                    expiry,
+                    template: {
+                        ...storedTemplate,
+                        sampleJsonData: variablesContent,
+                    },
+                }
+                localStorage.setItem(`template-${templateId}`, JSON.stringify(updatedData))
+            } catch (err) {
+                console.error('Failed to sync variables to localStorage:', err)
+            }
+        }
+    }, [variablesContent, templateId, template, isLoadingTemplate])
 
     if (isLoadingTemplate || isLoadingHtml) {
         return (
@@ -337,6 +345,7 @@ export default function DocifyEditorPage() {
                     currentEditor={currentEditor}
                     htmlContent={htmlContent}
                     variablesContent={variablesContent}
+                    pageSettings={pageSettings}
                     previewMode={previewMode}
                     zoom={zoom}
                     apiUrl={editor?.apiUrl || ''}
@@ -345,6 +354,7 @@ export default function DocifyEditorPage() {
                     sampleData={variablesContent}
                     onPushHtml={handlePushHtml}
                     onSyncMetadata={handleSyncMetadata}
+                    onPageSettingsChange={handlePageSettingsChange}
                     onEditorChange={handleEditorChange}
                     onHtmlChange={handleHtmlChange}
                     onVariablesChange={handleVariablesChange}
