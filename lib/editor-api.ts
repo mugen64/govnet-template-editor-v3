@@ -64,7 +64,7 @@ export function updateDocifyTemplate(template: any, editor: EditorConfig) {
             formData.append("file", htmlBlob, `${name.toUpperCase().replace(/[^A-Z0-9_]/g, '_')}.html`)
             formData.append("templateId", template.templateId)
 
-            const response = await fetch(`${editor.apiUrl}templates/${template.templateId}`, {
+            const response = await fetch(`${editor.apiUrl}/templates/${template.templateId}`, {
                 method: "PUT",
                 body: formData,
                 headers,

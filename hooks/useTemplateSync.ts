@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import {
-    getAllTemplatesFromStorage,
+    getAllTemplatesFromStorageForSyncing,
     prepareSyncPayload,
     getTemplatesByType,
     getTemplatesNeedingSync,
@@ -37,7 +37,7 @@ interface UseSyncTemplatesReturn {
  * Finds all templates in localStorage and prepares them for syncing
  */
 export function useTemplateSync(): UseSyncTemplatesReturn {
-    const { getEditor } = useEditorStorage()
+   
     const autoSyncStorageKey = 'docify-auto-sync-enabled'
     const [syncStatus, setSyncStatus] = useState<SyncStatus>({
         status: 'idle',
@@ -71,7 +71,7 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
 
     // Get total template count
     const getTemplateCount = useCallback(() => {
-        const templates = getAllTemplatesFromStorage()
+        const templates = getAllTemplatesFromStorageForSyncing()
         return templates.length
     }, [])
 
@@ -138,6 +138,9 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
                 const editors: EditorConfig[] = JSON.parse(localStorage.getItem(EDITOR_STORAGE_KEY) || '[]')
                 const template = getTemplateById(templateRef.templateId)
                 if (!template) {
+                    continue
+                }
+                if(!(template?.data as any).htmlContent) {    
                     continue
                 }
                 const editor = editors.find((e) => e.id === (template.editorId || templateRef.editorId))

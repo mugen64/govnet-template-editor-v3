@@ -61,7 +61,7 @@ interface TemplatesResponse {
   };
 }
 
-const ITEMS_PER_PAGE = 6;
+const ITEMS_PER_PAGE_OPTIONS = [6, 12, 24, 48];
 
 export default function NotifyPage() {
   const router = useRouter();
@@ -75,6 +75,7 @@ export default function NotifyPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(ITEMS_PER_PAGE_OPTIONS[0]);
   const [searchQuery, setSearchQuery] = useState(
     searchParams.get("search") ?? "",
   );
@@ -124,7 +125,7 @@ export default function NotifyPage() {
 
   const buildUrl = useCallback(
     (baseUrl: string, editorConfig: EditorConfig): string => {
-      let url = `${baseUrl}/templates?page=${currentPage}&limit=${ITEMS_PER_PAGE}`;
+      let url = `${baseUrl}/templates?page=${currentPage}&limit=${itemsPerPage}`;
 
       if (searchQuery.trim()) {
         url += `&q=${encodeURIComponent(searchQuery.trim())}`;
@@ -143,7 +144,7 @@ export default function NotifyPage() {
 
       return url;
     },
-    [currentPage, searchQuery],
+    [currentPage, searchQuery, itemsPerPage],
   );
 
   const fetchTemplates = useCallback(
@@ -170,7 +171,7 @@ export default function NotifyPage() {
         const data: TemplatesResponse = await response.json();
         setTemplates(data?.data || []);
         setTotalPages(
-          Math.ceil((data?.meta?.total || 0) / ITEMS_PER_PAGE),
+          Math.ceil((data?.meta?.total || 0) / itemsPerPage),
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
@@ -191,7 +192,7 @@ export default function NotifyPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, itemsPerPage]);
 
   const handleRefresh = async () => {
     if (!editor) return;
@@ -368,6 +369,49 @@ export default function NotifyPage() {
           {/* Templates Grid */}
           {!loading && templates.length > 0 && (
             <>
+              <div className="flex items-center justify-between border-t border-border pt-6 mb-6">
+                <div className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="text-sm text-muted-foreground">
+                    Items per page
+                  </label>
+                  <select
+                    className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+                    value={itemsPerPage}
+                    onChange={(event) => setItemsPerPage(Number(event.target.value))}
+                  >
+                    {ITEMS_PER_PAGE_OPTIONS.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                    className="gap-2"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNextPage}
+                    disabled={currentPage >= totalPages}
+                    className="gap-2"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
                 {templates.map((template) => (
                   <Card

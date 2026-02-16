@@ -21,6 +21,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -34,6 +41,7 @@ import {
 } from '@/components/ui/pagination'
 import { Plus, ChevronLeft } from 'lucide-react'
 import { useEditorStorage } from '@/hooks/useEditorStorage'
+import { toast } from 'sonner'
 import type { EditorConfig } from '@/lib/editor-types'
 
 interface PdfTemplate {
@@ -60,13 +68,13 @@ interface TemplatesResponse {
   data?: PdfTemplate[]
 }
 
-const ITEMS_PER_PAGE = 6
+const ITEMS_PER_PAGE_OPTIONS = [6, 12, 24, 48, 96, 192]
 
 export default function DocifyPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const editorId = searchParams.get('editorId')
-  const { getEditor, isLoaded } = useEditorStorage()
+  const { getEditor, isLoaded, editors } = useEditorStorage()
 
   const [editor, setEditor] = useState<EditorConfig | null>(null)
   const [templates, setTemplates] = useState<PdfTemplate[]>([])
@@ -75,11 +83,13 @@ export default function DocifyPage() {
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(ITEMS_PER_PAGE_OPTIONS[0])
   const [searchQuery, setSearchQuery] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [createName, setCreateName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([])
 
   useEffect(() => {
     if (isLoaded && editorId) {
@@ -226,15 +236,15 @@ export default function DocifyPage() {
   useEffect(() => {
     const nextTotalPages = Math.max(
       1,
-      Math.ceil(filteredTemplates.length / ITEMS_PER_PAGE)
+      Math.ceil(filteredTemplates.length / itemsPerPage)
     )
     setTotalPages(nextTotalPages)
     setCurrentPage((prev) => Math.min(prev, nextTotalPages))
-  }, [filteredTemplates])
+  }, [filteredTemplates, itemsPerPage])
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery])
+  }, [searchQuery, itemsPerPage])
 
   const handlePreviousPage = () => {
     setCurrentPage((prev) => Math.max(1, prev - 1))
@@ -255,6 +265,56 @@ export default function DocifyPage() {
     }
     localStorage.setItem(`template-${template.id}`, JSON.stringify(data))
     router.push(`/docify/editor?editorId=${editorId || ''}&templateId=${template.id}`)
+  }
+
+  const toggleTemplateSelection = (templateId: string) => {
+    setSelectedTemplateIds((prev) =>
+      prev.includes(templateId)
+        ? prev.filter((id) => id !== templateId)
+        : [...prev, templateId]
+    )
+  }
+
+  const handleTemplateCardClick = (template: PdfTemplate) => {
+    if (selectedTemplateIds.length > 0) {
+      toggleTemplateSelection(template.id)
+      return
+    }
+
+    handleTemplateClick(template, editorId || '')
+  }
+
+  const handleMoveTemplates = () => {
+    if (!editorId) {
+      toast.error('No editor selected')
+      return
+    }
+
+    if (selectedTemplateIds.length === 0) {
+      toast.info('No templates selected')
+      return
+    }
+
+    // Save selected templates to localStorage before navigating
+    selectedTemplateIds.forEach((templateId) => {
+      const template = templates.find((t) => t.id === templateId)
+      if (template) {
+        const expiry = Date.now() + 24 * 60 * 60 * 1000
+        const data = {
+          expiry,
+          template,
+          type: 'docify',
+          lastOpened: Date.now(),
+          editorId: editorId,
+        }
+        localStorage.setItem(`template-${templateId}`, JSON.stringify(data))
+      }
+    })
+
+    // Navigate to wizard
+    router.push(
+      `/docify/move?sourceEditorId=${editorId}&templateIds=${selectedTemplateIds.join(',')}`
+    )
   }
 
   const handleCreateTemplate = async () => {
@@ -371,8 +431,8 @@ export default function DocifyPage() {
   }
 
   const paginatedTemplates = filteredTemplates.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   )
 
   const getPaginationRange = () => {
@@ -475,18 +535,132 @@ export default function DocifyPage() {
           {/* Templates Grid */}
           {!loading && filteredTemplates.length > 0 && (
             <>
+              <div className="flex items-center justify-between border-t border-border pt-6 mb-6">
+                <div className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="text-sm text-muted-foreground">
+                    Items per page
+                  </label>
+                  <select
+                    className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+                    value={itemsPerPage}
+                    onChange={(event) => setItemsPerPage(Number(event.target.value))}
+                  >
+                    {ITEMS_PER_PAGE_OPTIONS.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <Pagination className="mx-0 w-auto">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          handlePreviousPage()
+                        }}
+                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+
+                    {getPaginationRange().start > 1 && (
+                      <>
+                        <PaginationItem>
+                          <PaginationLink
+                            href="#"
+                            onClick={(event) => {
+                              event.preventDefault()
+                              setCurrentPage(1)
+                            }}
+                          >
+                            1
+                          </PaginationLink>
+                        </PaginationItem>
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      </>
+                    )}
+
+                    {Array.from(
+                      { length: getPaginationRange().end - getPaginationRange().start + 1 },
+                      (_, index) => getPaginationRange().start + index
+                    ).map((page) => (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          href="#"
+                          isActive={page === currentPage}
+                          onClick={(event) => {
+                            event.preventDefault()
+                            setCurrentPage(page)
+                          }}
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+
+                    {getPaginationRange().end < totalPages && (
+                      <>
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                        <PaginationItem>
+                          <PaginationLink
+                            href="#"
+                            onClick={(event) => {
+                              event.preventDefault()
+                              setCurrentPage(totalPages)
+                            }}
+                          >
+                            {totalPages}
+                          </PaginationLink>
+                        </PaginationItem>
+                      </>
+                    )}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          handleNextPage()
+                        }}
+                        className={
+                          currentPage >= totalPages ? 'pointer-events-none opacity-50' : ''
+                        }
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
                 {paginatedTemplates.map((template) => (
                   <Card
                     key={template.id}
                     className="cursor-pointer transition-all hover:shadow-md hover:ring-2 hover:ring-ring/50"
-                    onClick={() => handleTemplateClick(template, editorId || '')}
+                    onClick={() => handleTemplateCardClick(template)}
                   >
                     <CardHeader>
                       <div className="space-y-2">
-                        <CardTitle className="text-lg truncate wrap-break-word">
-                          {getTemplateTitle(template)}
-                        </CardTitle>
+                        <div className="flex items-center justify-between gap-2">
+                          <CardTitle className="text-lg truncate wrap-break-word">
+                            {getTemplateTitle(template)}
+                          </CardTitle>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-primary"
+                            checked={selectedTemplateIds.includes(template.id)}
+                            onChange={() => toggleTemplateSelection(template.id)}
+                            onClick={(event) => event.stopPropagation()}
+                            aria-label={`Select ${getTemplateTitle(template)}`}
+                          />
+                        </div>
                         <CardDescription className="text-xs">
                           {formatDate(template.createdAt)}
                         </CardDescription>
@@ -615,6 +789,22 @@ export default function DocifyPage() {
           )}
         </div>
       </div>
+
+      {selectedTemplateIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-lg border border-border bg-background p-3 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              {selectedTemplateIds.length} selected
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setSelectedTemplateIds([])}>
+                Clear
+              </Button>
+              <Button onClick={handleMoveTemplates}>Move</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="sm:max-w-lg">
