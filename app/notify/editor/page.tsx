@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { EmailEditor } from '@/components/EmailEditor'
 import { SmsEditor } from '@/components/SmsEditor'
+import { useTemplateSync } from '@/hooks/useTemplateSync'
 import {
   Tabs,
   TabsContent,
@@ -29,6 +30,10 @@ import {
   Tablet,
   Smartphone,
   Home,
+  Cloud,
+  CloudOff,
+  CloudCheck,
+  Loader2,
 } from 'lucide-react'
 
 interface NotificationTemplate {
@@ -53,6 +58,8 @@ export default function NotifyEditorPage() {
   const editorId = searchParams.get('editorId')
   const templateId = searchParams.get('templateId')
   const currentEditor = searchParams.get('editor') || 'email'
+
+  const { syncStatus, triggerSync } = useTemplateSync()
 
   const [template, setTemplate] = useState<NotificationTemplate | null>(null)
   const [emailContent, setEmailContent] = useState('')
@@ -125,8 +132,9 @@ export default function NotifyEditorPage() {
     const storedData = localStorage.getItem(`template-${templateId}`)
     if (storedData) {
       try {
-        const { expiry, template: storedTemplate } = JSON.parse(storedData)
+        const { expiry, template: storedTemplate, ...rest } = JSON.parse(storedData)
         const updatedData = {
+          ...rest,
           expiry,
           template: {
             ...storedTemplate,
@@ -149,8 +157,9 @@ export default function NotifyEditorPage() {
     const storedData = localStorage.getItem(`template-${templateId}`)
     if (storedData) {
       try {
-        const { expiry, template: storedTemplate } = JSON.parse(storedData)
+        const { expiry, template: storedTemplate, ...rest } = JSON.parse(storedData)
         const updatedData = {
+          ...rest,
           expiry,
           template: {
             ...storedTemplate,
@@ -214,18 +223,54 @@ export default function NotifyEditorPage() {
     <main className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="border-b border-border px-4 py-4">
-        <div className="flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Home className="h-4 w-4" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Home className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Button variant="ghost" size="icon" onClick={handleBack} className="h-8 w-8">
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-          </Link>
-          <Button variant="ghost" size="icon" onClick={handleBack} className="h-8 w-8">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold">{getTemplateName()}</h1>
-            {template.key && <p className="text-xs text-muted-foreground">{template.key}</p>}
+            <div>
+              <h1 className="text-xl font-semibold">{getTemplateName()}</h1>
+              {template.key && <p className="text-xs text-muted-foreground">{template.key}</p>}
+            </div>
+          </div>
+
+          {/* Sync Status Indicator */}
+          <div className="flex items-center gap-2">
+            {syncStatus.status === 'idle' && (
+              <>
+                <Cloud className="h-4 w-4 text-muted-foreground" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={triggerSync}
+                >
+                  Sync
+                </Button>
+              </>
+            )}
+            {syncStatus.status === 'syncing' && (
+              <>
+                <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+                <span className="text-xs text-blue-500">Syncing...</span>
+              </>
+            )}
+            {syncStatus.status === 'success' && (
+              <>
+                <CloudCheck className="h-4 w-4 text-green-500" />
+                <span className="text-xs text-green-500">Synced</span>
+              </>
+            )}
+            {syncStatus.status === 'error' && (
+              <>
+                <CloudOff className="h-4 w-4 text-red-500" />
+                <span className="text-xs text-red-500">Failed</span>
+              </>
+            )}
           </div>
         </div>
       </div>

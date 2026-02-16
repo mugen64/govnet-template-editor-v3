@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useEditorStorage } from '@/hooks/useEditorStorage'
+import { useTemplateSync } from '@/hooks/useTemplateSync'
 import { DocifyEditorHeader } from '@/components/DocifyEditorHeader'
 import { DocifyEditorTabs } from '@/components/DocifyEditorTabs'
 import { extractGoTemplateVariables, mergeVariablesWithJson } from '@/lib/extract-template-variables'
@@ -37,6 +38,7 @@ export default function DocifyEditorPage() {
     const currentEditor = searchParams.get('editor') || 'code'
 
     const { getEditor, isLoaded: editorStorageLoaded } = useEditorStorage()
+    const { syncStatus, triggerSync } = useTemplateSync()
 
     const [editor, setEditor] = useState<EditorConfig | null>(null)
     const [template, setTemplate] = useState<PdfTemplate | null>(null)
@@ -202,8 +204,9 @@ export default function DocifyEditorPage() {
         const storedData = localStorage.getItem(`template-${templateId}`)
         if (storedData) {
             try {
-                const { expiry, template: storedTemplate } = JSON.parse(storedData)
+                const { expiry, template: storedTemplate, ...rest } = JSON.parse(storedData)
                 const updatedData = {
+                    ...rest,
                     expiry,
                     template: {
                         ...storedTemplate,
@@ -226,8 +229,9 @@ export default function DocifyEditorPage() {
         const storedData = localStorage.getItem(`template-${templateId}`)
         if (storedData) {
             try {
-                const { expiry, template: storedTemplate } = JSON.parse(storedData)
+                const { expiry, template: storedTemplate, ...rest } = JSON.parse(storedData)
                 const updatedData = {
+                    ...rest,
                     expiry,
                     template: {
                         ...storedTemplate,
@@ -270,6 +274,8 @@ export default function DocifyEditorPage() {
                 templateName={getTemplateName()}
                 refNumber={template.refNumber}
                 onBack={handleBack}
+                syncStatus={syncStatus}
+                onSync={triggerSync}
             />
 
             <div className="flex-1 flex overflow-hidden">

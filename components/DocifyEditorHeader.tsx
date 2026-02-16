@@ -1,17 +1,24 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, Home } from 'lucide-react'
+import { ChevronLeft, Home, Cloud, CloudOff, CloudCheck, Loader2 } from 'lucide-react'
 
 interface DocifyEditorHeaderProps {
     templateName: string
     refNumber?: string
     onBack: () => void
+    syncStatus?: {
+        status: 'idle' | 'syncing' | 'success' | 'error'
+        syncedTemplates: number
+    }
+    onSync?: () => void
 }
 
 export function DocifyEditorHeader({
     templateName,
     refNumber,
     onBack,
+    syncStatus,
+    onSync,
 }: DocifyEditorHeaderProps) {
     return (
         <div className="border-b border-border p-2">
@@ -30,6 +37,42 @@ export function DocifyEditorHeader({
                         <p className="text-xs text-muted-foreground">{refNumber || 'No reference'}</p>
                     </div>
                 </div>
+
+                {/* Sync Status Indicator */}
+                {syncStatus && (
+                    <div className="flex items-center gap-2">
+                        {syncStatus.status === 'idle' && (
+                            <>
+                                <Cloud className="h-4 w-4 text-muted-foreground" />
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={onSync}
+                                >
+                                    Sync
+                                </Button>
+                            </>
+                        )}
+                        {syncStatus.status === 'syncing' && (
+                            <>
+                                <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+                                <span className="text-xs text-blue-500">Syncing...</span>
+                            </>
+                        )}
+                        {syncStatus.status === 'success' && (
+                            <>
+                                <CloudCheck className="h-4 w-4 text-green-500" />
+                                <span className="text-xs text-green-500">Synced</span>
+                            </>
+                        )}
+                        {syncStatus.status === 'error' && (
+                            <>
+                                <CloudOff className="h-4 w-4 text-red-500" />
+                                <span className="text-xs text-red-500">Failed</span>
+                            </>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     )

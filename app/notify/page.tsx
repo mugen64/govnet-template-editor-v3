@@ -253,14 +253,17 @@ export default function NotifyPage() {
     return template.sms || template.email || "";
   };
 
-  const handleTemplateClick = (template: NotificationTemplate) => {
+  const handleTemplateClick = (template: NotificationTemplate, editorId: string) => {
     const expiry = Date.now() + 24 * 60 * 60 * 1000 // 24 hours from now
     const data = {
       expiry,
       template,
+      type: 'notify',
+      lastOpened: Date.now(),
+      editorId: editorId || '',
     }
     localStorage.setItem(`template-${template.id}`, JSON.stringify(data))
-    router.push(`/notify/editor?editorId=${editorId}&templateId=${template.id}`)
+    router.push(`/notify/editor?editorId=${editorId || ''}&templateId=${template.id}`)
   };
 
   const getTemplateTitle = (template: NotificationTemplate): string => {
@@ -370,7 +373,7 @@ export default function NotifyPage() {
                   <Card
                     key={template.id}
                     className="cursor-pointer transition-all hover:shadow-md hover:ring-2 hover:ring-ring/50"
-                    onClick={() => handleTemplateClick(template)}
+                    onClick={() => handleTemplateClick(template, editorId || '')}
                   >
                     <CardHeader>
                       <div className="flex items-start justify-between gap-2">
