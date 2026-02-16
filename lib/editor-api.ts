@@ -233,3 +233,53 @@ export function updateNotifyTemplate(template: any, editor: EditorConfig) {
         }
     })
 }
+
+export function createNotifyTemplate(template: any, editor: EditorConfig) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (!editor.apiUrl) {
+                throw new Error('Missing API URL for editor')
+            }
+
+            const headers: HeadersInit = {}
+            if (editor.credentialsType === 'header') {
+                editor.credentials.forEach((cred) => {
+                    if (cred.key && cred.value) {
+                        headers[cred.key] = cred.value
+                    }
+                })
+            }
+
+            const payload: EmailTemplatePayload = {
+                key: template.key || template.subject || '',
+                sender: template.sender || '',
+                subject: template.subject || template.key || '',
+                email: template.email || '',
+                sms: template.sms || '',
+                cc: template.cc || [],
+                bcc: template.bcc || [],
+                data: template.data || {},
+            }
+
+            const url = appendQueryCredentials(`${editor.apiUrl}/templates`, editor)
+
+            const response = await fetch(url, {
+                method: 'POST',
+                body: JSON.stringify(payload),
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...headers,
+                },
+            })
+
+            if (!response.ok) {
+                throw new Error(`Failed to create notify template: ${response.statusText}`)
+            }
+
+            resolve(true)
+        } catch (err) {
+            console.error('Failed to create notify template:', err)
+            reject(err)
+        }
+    })
+}

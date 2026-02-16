@@ -15,6 +15,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -35,6 +45,8 @@ import {
   Search,
 } from "lucide-react";
 import { useEditorStorage } from "@/hooks/useEditorStorage";
+import { toast } from "sonner";
+import { createNotifyTemplate } from "@/lib/editor-api";
 import type { EditorConfig } from "@/lib/editor-types";
 
 interface NotificationTemplate {
@@ -80,6 +92,15 @@ export default function NotifyPage() {
     searchParams.get("search") ?? "",
   );
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createKey, setCreateKey] = useState("");
+  const [createSubject, setCreateSubject] = useState("");
+  const [createSender, setCreateSender] = useState("");
+  const [createEmail, setCreateEmail] = useState("");
+  const [createSms, setCreateSms] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Load editor config once storage is ready
   useEffect(() => {
@@ -267,6 +288,97 @@ export default function NotifyPage() {
     router.push(`/notify/editor?editorId=${editorId || ''}&templateId=${template.id}`)
   };
 
+  const toggleTemplateSelection = (templateId: string) => {
+    setSelectedTemplateIds((prev) =>
+      prev.includes(templateId)
+        ? prev.filter((id) => id !== templateId)
+        : [...prev, templateId],
+    );
+  };
+
+  const handleTemplateCardClick = (template: NotificationTemplate) => {
+    if (selectedTemplateIds.length > 0) {
+      toggleTemplateSelection(template.id);
+      return;
+    }
+
+    handleTemplateClick(template, editorId || "");
+  };
+
+  const handleMoveTemplates = () => {
+    if (!editorId) {
+      toast.error("No editor selected");
+      return;
+    }
+
+    if (selectedTemplateIds.length === 0) {
+      toast.info("No templates selected");
+      return;
+    }
+
+    selectedTemplateIds.forEach((templateId) => {
+      const template = templates.find((t) => t.id === templateId);
+      if (template) {
+        const expiry = Date.now() + 24 * 60 * 60 * 1000;
+        const data = {
+          expiry,
+          template,
+          type: "notify",
+          lastOpened: Date.now(),
+          editorId: editorId,
+        };
+        localStorage.setItem(`template-${templateId}`, JSON.stringify(data));
+      }
+    });
+
+    router.push(
+      `/notify/move?sourceEditorId=${editorId}&templateIds=${selectedTemplateIds.join(",")}`,
+    );
+  };
+
+  const handleCreateTemplate = async () => {
+    if (!editor) {
+      setCreateError("Editor not loaded yet.");
+      return;
+    }
+
+    if (!createKey.trim()) {
+      setCreateError("Template key is required.");
+      return;
+    }
+
+    try {
+      setIsCreating(true);
+      setCreateError(null);
+
+      await createNotifyTemplate(
+        {
+          key: createKey.trim(),
+          subject: createSubject.trim() || createKey.trim(),
+          sender: createSender.trim(),
+          email: createEmail.trim(),
+          sms: createSms.trim(),
+          cc: [],
+          bcc: [],
+          data: {},
+        },
+        editor,
+      );
+
+      setIsCreateOpen(false);
+      setCreateKey("");
+      setCreateSubject("");
+      setCreateSender("");
+      setCreateEmail("");
+      setCreateSms("");
+      await fetchTemplates(editor);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   const getTemplateTitle = (template: NotificationTemplate): string => {
     return template.subject || template.key || "Untitled";
   };
@@ -314,7 +426,11 @@ export default function NotifyPage() {
                 />
                 Refresh
               </Button>
-              <Button className="gap-2" disabled={!editor}>
+              <Button
+                className="gap-2"
+                disabled={!editor}
+                onClick={() => setIsCreateOpen(true)}
+              >
                 <Plus className="h-4 w-4" />
                 New Notification Template
               </Button>
@@ -417,7 +533,7 @@ export default function NotifyPage() {
                   <Card
                     key={template.id}
                     className="cursor-pointer transition-all hover:shadow-md hover:ring-2 hover:ring-ring/50"
-                    onClick={() => handleTemplateClick(template, editorId || '')}
+                    onClick={() => handleTemplateCardClick(template)}
                   >
                     <CardHeader>
                       <div className="flex items-start justify-between gap-2">
@@ -432,33 +548,44 @@ export default function NotifyPage() {
                           )}
                         </div>
                         <CardAction>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger >
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Open menu</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Copy className="mr-2 h-4 w-4" />
-                                Duplicate
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem variant="destructive">
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-primary"
+                              checked={selectedTemplateIds.includes(template.id)}
+                              onChange={() => toggleTemplateSelection(template.id)}
+                              onClick={(event) => event.stopPropagation()}
+                              aria-label={`Select ${getTemplateTitle(template)}`}
+                            />
+                            <DropdownMenu>
+                              <DropdownMenuTrigger>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={(event) => event.stopPropagation()}
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                  <span className="sr-only">Open menu</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem>
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                  <Copy className="mr-2 h-4 w-4" />
+                                  Duplicate
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem variant="destructive">
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </CardAction>
                       </div>
                     </CardHeader>
@@ -530,6 +657,113 @@ export default function NotifyPage() {
           )}
         </div>
       </div>
+
+      {selectedTemplateIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-lg border border-border bg-background p-3 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              {selectedTemplateIds.length} selected
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedTemplateIds([])}
+              >
+                Clear
+              </Button>
+              <Button onClick={handleMoveTemplates}>Move</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold">
+              Create Notification Template
+            </DialogTitle>
+            <DialogDescription>
+              Provide the template key and content to create a new notification.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="notify-key">Template Key</Label>
+              <Input
+                id="notify-key"
+                placeholder="e.g., WELCOME_EMAIL"
+                value={createKey}
+                onChange={(event) => setCreateKey(event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notify-subject">Subject</Label>
+              <Input
+                id="notify-subject"
+                placeholder="Optional subject"
+                value={createSubject}
+                onChange={(event) => setCreateSubject(event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notify-sender">Sender</Label>
+              <Input
+                id="notify-sender"
+                placeholder="Optional sender"
+                value={createSender}
+                onChange={(event) => setCreateSender(event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notify-email">Email</Label>
+              <Textarea
+                id="notify-email"
+                placeholder="Email template HTML"
+                value={createEmail}
+                onChange={(event) => setCreateEmail(event.target.value)}
+                rows={5}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notify-sms">SMS</Label>
+              <Textarea
+                id="notify-sms"
+                placeholder="SMS template text"
+                value={createSms}
+                onChange={(event) => setCreateSms(event.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          {createError && (
+            <p className="text-xs text-destructive">{createError}</p>
+          )}
+
+          <DialogFooter className="pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateOpen(false)}
+              disabled={isCreating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateTemplate}
+              disabled={!editor || isCreating}
+              className="gap-2"
+            >
+              {isCreating ? "Creating..." : "Create Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
