@@ -12,7 +12,7 @@ import {
 } from '@/lib/template-sync-worker'
 import { EDITOR_STORAGE_KEY, useEditorStorage } from './useEditorStorage'
 import { EditorConfig } from '@/lib/editor-types'
-import { updateDocifyTemplate, updateDocifyTemplateVariable } from '@/lib/editor-api'
+import { updateDocifyTemplate, updateDocifyTemplateVariable, updateNotifyTemplate } from '@/lib/editor-api'
 
 interface SyncStatus {
     status: 'idle' | 'syncing' | 'success' | 'error'
@@ -187,7 +187,7 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
                     }
                 } else if (template.type === 'notify') {
                     try {
-                        await updateDocifyTemplateVariable(template, editor)
+                        await updateNotifyTemplate(template, editor)
                         setSyncStatus((prev) => ({
                             ...prev,
                             syncedTemplates: prev.syncedTemplates + 1,

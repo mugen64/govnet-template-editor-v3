@@ -119,7 +119,7 @@ export function updateNotifyTemplate(template: any, editor: EditorConfig) {
                 data: data.data || {},
             }
 
-            const response = await fetch(`${editor.apiUrl}templates/${template.templateId}`, {
+            const response = await fetch(`${editor.apiUrl}/templates/${template.templateId}`, {
                 method: "PUT",
                 body: JSON.stringify(payload),
                 headers: {
