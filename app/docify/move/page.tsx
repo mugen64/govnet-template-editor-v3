@@ -15,6 +15,11 @@ import {
 import { ChevronLeft, ArrowRight } from 'lucide-react'
 import { useEditorStorage } from '@/hooks/useEditorStorage'
 import { toast } from 'sonner'
+import {
+  createDocifyTemplate,
+  updateDocifyTemplate,
+  updateDocifyTemplateVariable,
+} from '@/lib/editor-api'
 import type { EditorConfig } from '@/lib/editor-types'
 
 interface PdfTemplate {
@@ -325,15 +330,27 @@ export default function DocifyMovePage() {
         )
 
         if (existingTarget) {
-          toast.info(`Would update: ${template.name}`)
+          const targetPayload = {
+            ...template,
+            id: existingTarget.id,
+            name:
+              template.name ||
+              existingTarget.name ||
+              existingTarget.fileName ||
+              template.fileName,
+          }
+          await updateDocifyTemplateVariable(targetPayload, targetEditor)
+          await updateDocifyTemplate(targetPayload, targetEditor)
+          toast.success(`Updated: ${template.name}`)
         } else {
-          toast.info(`Would create: ${template.name}`)
+          await createDocifyTemplate(template, targetEditor)
+          toast.success(`Created: ${template.name}`)
         }
       }
 
-      templateIds.forEach((id) => {
-        localStorage.removeItem(`template-${id}`)
-      })
+      for (const id of templateIds)  {
+        await localStorage.removeItem(`template-${id}`)
+      }
 
       toast.success('Move completed')
       router.push(`/docify?editorId=${targetEditorId}`)
@@ -352,11 +369,11 @@ export default function DocifyMovePage() {
       : 'create'
   }
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     // Clear all templates from localStorage
-    templateIds.forEach((id) => {
-      localStorage.removeItem(`template-${id}`)
-    })
+    for (const id of templateIds) {
+      await localStorage.removeItem(`template-${id}`)
+    }
     router.push(`/docify?editorId=${sourceEditorId}`)
   }
 

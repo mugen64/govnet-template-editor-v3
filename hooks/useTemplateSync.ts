@@ -156,7 +156,7 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
                 await new Promise((resolve) => setTimeout(resolve, 1000))
                 if (template.type === 'docify') {
                     try {
-                        await updateDocifyTemplateVariable(template, editor)
+                        await updateDocifyTemplateVariable(template.data, editor)
                         setSyncStatus((prev) => ({
                             ...prev,
                             syncedTemplates: prev.syncedTemplates + 1,
@@ -173,7 +173,8 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
                     }
 
                     try {
-                        await updateDocifyTemplate(template, editor)
+                        
+                        await updateDocifyTemplate(template.data, editor)
                         setSyncStatus((prev) => ({
                             ...prev,
                             syncedTemplates: prev.syncedTemplates + 1,
@@ -190,7 +191,7 @@ export function useTemplateSync(): UseSyncTemplatesReturn {
                     }
                 } else if (template.type === 'notify') {
                     try {
-                        await updateNotifyTemplate(template, editor)
+                        await updateNotifyTemplate(template.data, editor)
                         setSyncStatus((prev) => ({
                             ...prev,
                             syncedTemplates: prev.syncedTemplates + 1,

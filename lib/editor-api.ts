@@ -3,14 +3,14 @@ import { EditorConfig } from "./editor-types"
 export function updateDocifyTemplateVariable(template: any, editor: EditorConfig) {
     return new Promise(async (resolve, reject) => {
         try {
-            const data = template.data as any
+           
             const jsonFormData = new FormData()
-            jsonFormData.append("templateId", data.id)
-            jsonFormData.append("name", data.name)
-            jsonFormData.append("pageSettings", JSON.stringify(data.pageSettings))
-            jsonFormData.append("sampleJsonData", data.sampleJsonData)
-            jsonFormData.append("folderName", data.folderName)
-            jsonFormData.append("tags", JSON.stringify(data.tags))
+            jsonFormData.append("templateId", template.id)
+            jsonFormData.append("name", template.name)
+            jsonFormData.append("pageSettings", JSON.stringify(template.pageSettings))
+            jsonFormData.append("sampleJsonData", template.sampleJsonData)
+            jsonFormData.append("folderName", template.folderName)
+            jsonFormData.append("tags", JSON.stringify(template.tags))
 
             const headers: HeadersInit = {}
             if (editor.credentialsType === 'header') {
@@ -21,19 +21,19 @@ export function updateDocifyTemplateVariable(template: any, editor: EditorConfig
                 })
             }
 
-            const response = await fetch(`${editor.apiUrl}/templates/edit-page-settings/${template.templateId}`, {
+            const response = await fetch(`${editor.apiUrl}/templates/edit-page-settings/${template.id}`, {
                 method: "PUT",
                 body: jsonFormData,
                 headers,
             })
 
             if (!response.ok) {
-                throw new Error(`Failed to update template ${template.templateId}: ${response.statusText}`)
+                throw new Error(`Failed to update template ${template.id}: ${response.statusText}`)
             }
 
             resolve(true)
         } catch (err) {
-            console.error(`Failed to update docify template ${template.templateId}:`, err)
+            console.error(`Failed to update docify template ${template.id}:`, err)
             reject(err)
         }
     })
@@ -42,7 +42,6 @@ export function updateDocifyTemplateVariable(template: any, editor: EditorConfig
 export function updateDocifyTemplate(template: any, editor: EditorConfig) {
     return new Promise(async (resolve, reject) => {
         try {
-            const data = template.data as any
 
             const headers: HeadersInit = {}
             if (editor.credentialsType === 'header') {
@@ -53,8 +52,8 @@ export function updateDocifyTemplate(template: any, editor: EditorConfig) {
                 })
             }
 
-            const htmlContent = (template.data as any).htmlContent || ''
-            const name = (template.data as any).name || `template-${template.templateId}`
+            const htmlContent = template.htmlContent || ''
+            const name = template.name || `template-${template.id}`
             const file = new File([htmlContent], 'template.html', {
                 type: 'text/html',
             })
@@ -62,21 +61,117 @@ export function updateDocifyTemplate(template: any, editor: EditorConfig) {
             const formData = new FormData()
             const htmlBlob = new Blob([htmlContent], { type: "text/html" })
             formData.append("file", htmlBlob, `${name.toUpperCase().replace(/[^A-Z0-9_]/g, '_')}.html`)
-            formData.append("templateId", template.templateId)
+            formData.append("templateId", template.id)
 
-            const response = await fetch(`${editor.apiUrl}/templates/${template.templateId}`, {
+            const response = await fetch(`${editor.apiUrl}/templates/${template.id}`, {
                 method: "PUT",
                 body: formData,
                 headers,
             })
 
             if (!response.ok) {
-                throw new Error(`Failed to prepare HTML content for template ${template.templateId}: ${response.statusText}`)
+                throw new Error(`Failed to prepare HTML content for template ${template.id}: ${response.statusText}`)
             }
 
             resolve(true)
         } catch (err) {
-            console.error(`Failed to update docify template ${template.templateId}:`, err)
+            console.error(`Failed to update docify template ${template.id}:`, err)
+            reject(err)
+        }
+    })
+}
+
+const appendQueryCredentials = (url: string, editor: EditorConfig): string => {
+    if (editor.credentialsType === 'query') {
+        const params = new URLSearchParams()
+        editor.credentials.forEach((cred) => {
+            if (cred.key && cred.value) {
+                params.append(cred.key, cred.value)
+            }
+        })
+        if (Array.from(params.keys()).length > 0) {
+            return `${url}?${params.toString()}`
+        }
+    }
+
+    return url
+}
+
+export function createDocifyTemplate(template: any, editor: EditorConfig) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (!editor.apiUrl) {
+                throw new Error('Missing API URL for editor')
+            }
+
+            const headers: HeadersInit = {}
+            if (editor.credentialsType === 'header') {
+                editor.credentials.forEach((cred) => {
+                    if (cred.key && cred.value) {
+                        headers[cred.key] = cred.value
+                    }
+                })
+            }
+
+            const sampleHtml = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sample Template</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
+      h1 { font-size: 20px; margin: 0 0 12px; }
+      p { margin: 0 0 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>Sample PDF Template</h1>
+    <p>This is a placeholder HTML file for a new PDF template.</p>
+    <p>Replace this content with your actual template markup.</p>
+  </body>
+</html>
+`
+
+            const htmlContent = template.htmlContent || sampleHtml
+            const name = template.name || template.fileName || `template-${Date.now()}`
+            const fileName = `${name.toUpperCase().replace(/[^A-Z0-9_]/g, '_')}.html`
+            const htmlBlob = new Blob([htmlContent], { type: 'text/html' })
+
+            const formData = new FormData()
+            formData.append('name', name)
+            formData.append('file', htmlBlob, fileName)
+            formData.append('folderName', template.folderName || '')
+            formData.append('tags', JSON.stringify(template.tags || []))
+            formData.append(
+                'pageSettings',
+                JSON.stringify(
+                    template.pageSettings || {
+                        pageSize: 'A4',
+                        orientation: 'portrait',
+                        marginTop: 15,
+                        marginBottom: 15,
+                        marginLeft: 15,
+                        marginRight: 15,
+                    }
+                )
+            )
+            formData.append('sampleJsonData', template.sampleJsonData || JSON.stringify({}))
+
+            const url = appendQueryCredentials(`${editor.apiUrl}templates`, editor)
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers,
+                body: formData,
+            })
+
+            if (!response.ok) {
+                throw new Error(`Failed to create template: ${response.statusText}`)
+            }
+
+            resolve(true)
+        } catch (err) {
+            console.error('Failed to create docify template:', err)
             reject(err)
         }
     })
@@ -97,7 +192,6 @@ export interface EmailTemplatePayload {
 export function updateNotifyTemplate(template: any, editor: EditorConfig) {
     return new Promise(async (resolve, reject) => {
         try {
-            const data = template.data as any
 
             const headers: HeadersInit = {}
             if (editor.credentialsType === 'header') {
@@ -109,17 +203,17 @@ export function updateNotifyTemplate(template: any, editor: EditorConfig) {
             }
 
             const payload: EmailTemplatePayload = {
-                key: data.key,
-                sender: data.sender,
-                subject: data.subject,
-                email: data.email,
-                sms: data.sms,
-                cc: data.cc || [],
-                bcc: data.bcc || [],
-                data: data.data || {},
+                key: template.key,
+                sender: template.sender,
+                subject: template.subject,
+                email: template.email,
+                sms: template.sms,
+                cc: template.cc || [],
+                bcc: template.bcc || [],
+                data: template.data || {},
             }
 
-            const response = await fetch(`${editor.apiUrl}/templates/${template.templateId}`, {
+            const response = await fetch(`${editor.apiUrl}/templates/${template.id}`, {
                 method: "PUT",
                 body: JSON.stringify(payload),
                 headers: {
@@ -129,12 +223,12 @@ export function updateNotifyTemplate(template: any, editor: EditorConfig) {
             })
 
             if (!response.ok) {
-                throw new Error(`Failed to update notify template ${template.templateId}: ${response.statusText}`)
+                throw new Error(`Failed to update notify template ${template.id}: ${response.statusText}`)
             }
 
             resolve(true)
         } catch (err) {
-            console.error(`Failed to update notify template ${template.templateId}:`, err)
+            console.error(`Failed to update notify template ${template.id}:`, err)
             reject(err)
         }
     })
