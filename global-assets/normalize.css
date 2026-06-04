@@ -17,18 +17,19 @@
 *::before,
 *::after {
   box-sizing: border-box;
+  font-family:  "DejaVu Sans", "Liberation Serif", "Times New Roman", serif;
 }
 
 html {
   font-size: 12px;
-  font-family: "Liberation Serif", "Times New Roman", serif;
+  font-family: "DejaVu Sans", "Liberation Serif", "Times New Roman", serif;
 }
 
 body {
   margin: 0;
   padding: 0;
 
-  font-family: "Liberation Serif", "Times New Roman", serif;
+  font-family:  "DejaVu Sans", "Liberation Serif", "Times New Roman", serif;
 
   font-size: 12px;
   line-height: 1.4;
@@ -52,7 +53,7 @@ h5,
 h6 {
   font-weight: bold;
 
-  line-height: 1.15;
+  line-height: 1.2;
 
   margin-top: 10px;
   margin-bottom: 6px;

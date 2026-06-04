@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   Mail,
   MessageSquare,
+  Settings,
   ZoomIn,
   ZoomOut,
   RefreshCw,
@@ -50,6 +51,17 @@ interface NotificationTemplate {
   updatedAt?: string
   type?: 'SMS' | 'EMAIL' | 'PUSH' | string
   channel?: string
+}
+
+function formatAddressList(addresses?: string[]): string {
+  return addresses?.join(', ') || ''
+}
+
+function parseAddressList(value: string): string[] {
+  return value
+    .split(/[\n,]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
 }
 
 function getInitialTemplate(templateId: string | null): NotificationTemplate | null {
@@ -101,8 +113,13 @@ export default function NotifyEditorPage() {
           : 'text-red-500'
 
   const [template] = useState<NotificationTemplate | null>(() => getInitialTemplate(templateId))
+  const [templateKey, setTemplateKey] = useState(() => getInitialTemplate(templateId)?.key || '')
+  const [subject, setSubject] = useState(() => getInitialTemplate(templateId)?.subject || '')
+  const [sender, setSender] = useState(() => getInitialTemplate(templateId)?.sender || '')
   const [emailContent, setEmailContent] = useState(() => getInitialTemplate(templateId)?.email || '')
   const [smsContent, setSmsContent] = useState(() => getInitialTemplate(templateId)?.sms || '')
+  const [ccList, setCcList] = useState(() => formatAddressList(getInitialTemplate(templateId)?.cc))
+  const [bccList, setBccList] = useState(() => formatAddressList(getInitialTemplate(templateId)?.bcc))
   const [zoom, setZoom] = useState(100)
   const [deviceView, setDeviceView] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
 
@@ -114,6 +131,11 @@ export default function NotifyEditorPage() {
   }
 
   const getTemplateName = (): string => {
+    const nextTitle = subject.trim() || templateKey.trim()
+    if (nextTitle) {
+      return nextTitle
+    }
+
     if (!template) return 'Unknown Template'
     return template.subject || template.key || 'Untitled'
   }
@@ -150,7 +172,17 @@ export default function NotifyEditorPage() {
           return
         }
 
-        if (storedTemplate.email === emailContent && storedTemplate.sms === smsContent) {
+        const nextCc = parseAddressList(ccList)
+        const nextBcc = parseAddressList(bccList)
+        if (
+          storedTemplate.key === templateKey &&
+          storedTemplate.subject === subject &&
+          storedTemplate.sender === sender &&
+          storedTemplate.email === emailContent &&
+          storedTemplate.sms === smsContent &&
+          JSON.stringify(storedTemplate.cc || []) === JSON.stringify(nextCc) &&
+          JSON.stringify(storedTemplate.bcc || []) === JSON.stringify(nextBcc)
+        ) {
           return
         }
 
@@ -159,8 +191,13 @@ export default function NotifyEditorPage() {
           expiry,
           template: {
             ...storedTemplate,
+            key: templateKey,
+            subject,
+            sender,
             email: emailContent,
             sms: smsContent,
+            cc: nextCc,
+            bcc: nextBcc,
           },
         }
         localStorage.setItem(`template-${templateId}`, JSON.stringify(updatedData))
@@ -170,7 +207,7 @@ export default function NotifyEditorPage() {
     }, 250)
 
     return () => window.clearTimeout(timeoutId)
-  }, [emailContent, smsContent, templateId, template])
+  }, [bccList, ccList, emailContent, sender, smsContent, subject, templateId, template, templateKey])
 
   if (!template) {
     return (
@@ -251,6 +288,9 @@ export default function NotifyEditorPage() {
             <TabsTrigger value="sms" title="SMS Editor" className="w-full cursor-pointer hover:bg-accent">
               <MessageSquare className="h-10 w-10" />
             </TabsTrigger>
+                <TabsTrigger value="settings" title="Settings" className="w-full cursor-pointer hover:bg-accent">
+                  <Settings className="h-10 w-10" />
+                </TabsTrigger>
           </TabsList>
 
           <ResizablePanelGroup orientation="horizontal" className="flex-1 w-full">
@@ -270,6 +310,83 @@ export default function NotifyEditorPage() {
                   zoom={zoom}
                 />
               </TabsContent>
+
+              <TabsContent value="settings" className="flex-1 flex-col overflow-hidden flex h-full w-full">
+                <div className="flex h-full flex-col overflow-hidden">
+                  <div className="bg-muted/50 px-4 py-2 border-b border-border">
+                    <p className="text-xs font-medium text-muted-foreground">Notification Settings</p>
+                  </div>
+                  <div className="flex-1 overflow-auto p-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <label htmlFor="template-key" className="text-sm font-medium">
+                          Key
+                        </label>
+                        <input
+                          id="template-key"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={templateKey}
+                          readOnly
+                          aria-readonly="true"
+                          placeholder="commercial-service-report"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label htmlFor="template-sender" className="text-sm font-medium">
+                          Sender
+                        </label>
+                        <input
+                          id="template-sender"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={sender}
+                          onChange={(event) => setSender(event.target.value)}
+                          placeholder="MTIC IMS"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      <label htmlFor="template-subject" className="text-sm font-medium">
+                        Subject
+                      </label>
+                      <input
+                        id="template-subject"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={subject}
+                        onChange={(event) => setSubject(event.target.value)}
+                        placeholder="Commercial service report {geoUnit}"
+                      />
+                    </div>
+
+                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <label htmlFor="template-cc" className="text-sm font-medium">
+                          CC
+                        </label>
+                        <textarea
+                          id="template-cc"
+                          className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={ccList}
+                          onChange={(event) => setCcList(event.target.value)}
+                          placeholder="Separate addresses with commas or new lines"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label htmlFor="template-bcc" className="text-sm font-medium">
+                          BCC
+                        </label>
+                        <textarea
+                          id="template-bcc"
+                          className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={bccList}
+                          onChange={(event) => setBccList(event.target.value)}
+                          placeholder="Separate addresses with commas or new lines"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
             </ResizablePanel>
 
             <ResizableHandle />
@@ -278,10 +395,18 @@ export default function NotifyEditorPage() {
               <div className="bg-muted/50 px-4 py-2 border-b border-border flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">
-                    {currentEditor === 'email' ? 'Email Preview' : 'SMS Preview'}
+                    {currentEditor === 'email'
+                      ? 'Email Preview'
+                      : currentEditor === 'sms'
+                        ? 'SMS Preview'
+                        : 'Notification Summary'}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {currentEditor === 'email' ? 'Live preview of your email template' : 'How your SMS will appear on mobile devices'}
+                    {currentEditor === 'email'
+                      ? 'Live preview of your email template'
+                      : currentEditor === 'sms'
+                        ? 'How your SMS will appear on mobile devices'
+                        : 'Review notification metadata that will be synced'}
                   </p>
                 </div>
                 {currentEditor === 'email' && (
@@ -345,7 +470,7 @@ export default function NotifyEditorPage() {
                       <p className="text-muted-foreground">Enter HTML to see email preview</p>
                     </div>
                   )
-                ) : (
+                ) : currentEditor === 'sms' ? (
                   <div className="w-full max-w-sm">
                     <div className="flex flex-col items-end">
                       <div className="bg-gray-200 rounded-3xl rounded-tr-none px-4 py-2 max-w-xs">
@@ -356,6 +481,35 @@ export default function NotifyEditorPage() {
                     </div>
                     <div className="mt-4 text-xs text-gray-500 text-right">
                       {smsContent.length} / 160 characters
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full max-w-xl rounded-lg border border-border bg-background p-6 shadow-sm">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Key</p>
+                        <p className="mt-1 break-all text-sm">{templateKey || 'Not set'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sender</p>
+                        <p className="mt-1 break-all text-sm">{sender || 'Not set'}</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Subject</p>
+                        <p className="mt-1 break-all text-sm">{subject || 'Not set'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">CC</p>
+                        <p className="mt-1 whitespace-pre-wrap break-all text-sm">
+                          {parseAddressList(ccList).join('\n') || 'None'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">BCC</p>
+                        <p className="mt-1 whitespace-pre-wrap break-all text-sm">
+                          {parseAddressList(bccList).join('\n') || 'None'}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -399,6 +553,8 @@ export default function NotifyEditorPage() {
           size="icon"
           className="h-8 w-8"
           title="Save"
+          onClick={() => triggerSync({ source: 'manual' })}
+          disabled={syncStatus.status === 'syncing'}
         >
           <Save className="h-4 w-4" />
         </Button>
