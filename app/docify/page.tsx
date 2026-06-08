@@ -634,7 +634,7 @@ export default function DocifyPage() {
                     <CardHeader>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-2">
-                          <CardTitle className="text-lg truncate wrap-break-word">
+                          <CardTitle className="text-lg wrap-break-word">
                             {getTemplateTitle(template)}
                           </CardTitle>
                           <input

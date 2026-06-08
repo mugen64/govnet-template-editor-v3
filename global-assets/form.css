@@ -38,7 +38,7 @@ body {
 
 
 p {
-  line-height: 1.4;
+  line-height: 1.8;
 }
 
 body {
@@ -128,12 +128,20 @@ body {
   padding-bottom: 8px;
 }
 
-.value {
+.value , .value--inline{
   font-weight: bold;
-  display: inline-block;
-  border-bottom: 1px solid;
   text-transform: uppercase;
-  min-width: 24px;
+  min-width: 14px;
+}
+
+.value {
+  display: inline-block;
+  line-height: 1rem;
+  border-bottom: 1px solid;
+}
+
+.value--inline {
+  text-decoration: underline;
 }
 
 .value-underlined {
@@ -242,6 +250,10 @@ th {
   font-weight: normal;
   text-align: left;
 }
+
+  th {
+      font-weight:bold;
+    }
 
 .text-normal,
 table.text-normal td {
