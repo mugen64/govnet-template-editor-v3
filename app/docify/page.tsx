@@ -452,7 +452,7 @@ export default function DocifyPage() {
             <ChevronLeft className="h-4 w-4" />
             Back to editors
           </Link>
-          <h1 className="text-3xl font-bold tracking-tight">PDF Management</h1>
+          <h1 className="text-3xl font-bold tracking-tight">PDF Management <span className="text-sm text-red-500">({editor?.name})</span></h1>
           <p className="mt-2 text-muted-foreground">
             Manage your PDF document templates and global assets
           </p>

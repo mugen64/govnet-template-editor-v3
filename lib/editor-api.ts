@@ -157,7 +157,7 @@ export async function updateDocifyTemplate(template: TemplateInput, editor: Edit
     }
 }
 
-export async function createDocifyTemplate(template: TemplateInput, editor: EditorConfig) {
+export async function createDocifyTemplate(template: TemplateInput, editor: EditorConfig, skipFailure = false) {
     try {
         if (!editor.apiUrl) {
             throw new Error('Missing API URL for editor')
@@ -226,9 +226,12 @@ export async function createDocifyTemplate(template: TemplateInput, editor: Edit
 
         return true
     } catch (err) {
-        const error = asError('Failed to create docify template', err)
+        const error = asError('Failed to create docify template.'+template.name+' Skipping ', err)
         console.error(error.message)
-        throw error
+        if (!skipFailure) {
+            throw error
+        }
+        return false
     }
 }
 

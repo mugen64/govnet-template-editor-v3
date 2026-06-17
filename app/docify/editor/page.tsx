@@ -685,6 +685,7 @@ export default function DocifyEditorPage() {
                 onSync={() => triggerSync({ source: 'manual' })}
                 autoSyncEnabled={autoSyncEnabled}
                 onAutoSyncToggle={() => setAutoSyncEnabled(!autoSyncEnabled)}
+                editorName={editor?.name}
             />
 
             <div className="flex-1 flex overflow-hidden">

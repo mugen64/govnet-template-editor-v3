@@ -4,6 +4,7 @@ import { ChevronLeft, Home, Cloud, CloudOff, CloudCheck, Loader2 } from 'lucide-
 
 interface DocifyEditorHeaderProps {
     templateName: string
+    editorName?: string
     refNumber?: string
     onBack: () => void
     syncStatus?: {
@@ -17,6 +18,7 @@ interface DocifyEditorHeaderProps {
 
 export function DocifyEditorHeader({
     templateName,
+    editorName,
     refNumber,
     onBack,
     syncStatus,
@@ -54,8 +56,9 @@ export function DocifyEditorHeader({
                         <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <div>
-                        <h1 className="text-xl font-semibold">{templateName}</h1>
+                        <h1 className="text-xl font-semibold">{templateName} {editorName && <span className="text-xs text-red-300">{editorName}</span>}</h1>
                         <p className="text-xs text-muted-foreground">{refNumber || 'No reference'}</p>
+                        
                     </div>
                 </div>
 

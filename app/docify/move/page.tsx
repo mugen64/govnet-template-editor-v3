@@ -343,7 +343,7 @@ export default function DocifyMovePage() {
           await updateDocifyTemplate(targetPayload, targetEditor)
           toast.success(`Updated: ${template.name}`)
         } else {
-          await createDocifyTemplate(template, targetEditor)
+          await createDocifyTemplate(template, targetEditor, true)
           toast.success(`Created: ${template.name}`)
         }
       }
@@ -388,7 +388,7 @@ export default function DocifyMovePage() {
             <ChevronLeft className="h-4 w-4" />
             Cancel and Go Back
           </button>
-          <h1 className="text-3xl font-bold tracking-tight">Move Templates</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Move Templates </h1>
           <p className="mt-2 text-muted-foreground">
             Moving {sourceTemplates.length} template(s) to another editor
           </p>
