@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
   Card,
@@ -36,6 +36,8 @@ import { Plus, ChevronLeft } from 'lucide-react'
 import { useEditorStorage } from '@/hooks/useEditorStorage'
 import { toast } from 'sonner'
 import type { EditorConfig } from '@/lib/editor-types'
+import { DEFAULT_PREVIEW_ENDPOINTS } from '@/lib/editor-types'
+import { decodeBase64Utf8 } from '@/lib/base64'
 
 interface PdfTemplate {
   id: string
@@ -43,6 +45,7 @@ interface PdfTemplate {
   refNumber?: string
   fileName?: string
   folderName?: string
+  htmlContent?: string
   sampleJsonData?: string
   pageSettings?: {
     pageSize?: string
@@ -83,6 +86,11 @@ export default function DocifyPage() {
   const [createError, setCreateError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([])
+  const selectAllCheckboxRef = useRef<HTMLInputElement>(null)
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false)
+  const [generateAllTotal, setGenerateAllTotal] = useState(0)
+  const [generateAllCompleted, setGenerateAllCompleted] = useState(0)
+  const [finishedTemplateNames, setFinishedTemplateNames] = useState<string[]>([])
 
   useEffect(() => {
     if (isLoaded && editorId) {
@@ -163,6 +171,24 @@ export default function DocifyPage() {
   const buildDocumentGeneratorUrl = useCallback(
     (baseUrl: string, editorConfig: EditorConfig): string => {
       const url = `${baseUrl}templates`
+      return appendQueryCredentials(url, editorConfig)
+    },
+    []
+  )
+
+  const buildTemplatePreviewUrl = useCallback(
+    (baseUrl: string, refNumber: string, editorConfig: EditorConfig): string => {
+      const url = `${baseUrl}/templates/preview/${encodeURIComponent(refNumber)}`
+      return appendQueryCredentials(url, editorConfig)
+    },
+    []
+  )
+
+  const buildPdfPreviewUrl = useCallback(
+    (baseUrl: string, editorConfig: EditorConfig): string => {
+      const endpoint =
+        editorConfig.previewEndpoints?.[0] || DEFAULT_PREVIEW_ENDPOINTS[0]
+      const url = `${baseUrl}${endpoint}`
       return appendQueryCredentials(url, editorConfig)
     },
     []
@@ -279,6 +305,34 @@ export default function DocifyPage() {
     handleTemplateClick(template, editorId || '')
   }
 
+  const filteredTemplateIds = filteredTemplates.map((template) => template.id)
+  const allFilteredSelected =
+    filteredTemplateIds.length > 0 &&
+    filteredTemplateIds.every((id) => selectedTemplateIds.includes(id))
+  const someFilteredSelected =
+    filteredTemplateIds.some((id) => selectedTemplateIds.includes(id)) &&
+    !allFilteredSelected
+
+  useEffect(() => {
+    if (selectAllCheckboxRef.current) {
+      selectAllCheckboxRef.current.indeterminate = someFilteredSelected
+    }
+  }, [someFilteredSelected])
+
+  const toggleSelectAllFilteredTemplates = () => {
+    if (allFilteredSelected) {
+      const filteredSet = new Set(filteredTemplateIds)
+      setSelectedTemplateIds((prev) => prev.filter((id) => !filteredSet.has(id)))
+      return
+    }
+
+    setSelectedTemplateIds((prev) => {
+      const nextIds = new Set(prev)
+      filteredTemplateIds.forEach((id) => nextIds.add(id))
+      return Array.from(nextIds)
+    })
+  }
+
   const handleMoveTemplates = () => {
     if (!editorId) {
       toast.error('No editor selected')
@@ -311,6 +365,148 @@ export default function DocifyPage() {
       `/docify/move?sourceEditorId=${editorId}&templateIds=${selectedTemplateIds.join(',')}`
     )
   }
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.target = '_self'
+    link.rel = 'noopener noreferrer'
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
+  const getTemplateHtmlForGenerate = useCallback(
+    async (template: PdfTemplate, editorConfig: EditorConfig): Promise<string> => {
+      if (template.htmlContent?.trim()) {
+        return template.htmlContent
+      }
+
+      if (!template.refNumber) {
+        throw new Error(`Template ${template.name || template.id} has no ref number`)
+      }
+
+      const headers = buildAuthHeaders(editorConfig)
+      const previewUrl = buildTemplatePreviewUrl(
+        editorConfig.apiUrl,
+        template.refNumber,
+        editorConfig
+      )
+      const response = await fetch(previewUrl, { headers })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch HTML for ${template.name || template.id}`)
+      }
+
+      const payload = (await response.json()) as { data?: string }
+      if (!payload.data) {
+        throw new Error(`Missing HTML data for ${template.name || template.id}`)
+      }
+
+      return decodeBase64Utf8(payload.data)
+    },
+    [buildAuthHeaders, buildTemplatePreviewUrl]
+  )
+
+  const handleGenerateAll = useCallback(async () => {
+    if (!editor) {
+      toast.error('Editor not loaded yet')
+      return
+    }
+
+    if (selectedTemplateIds.length === 0) {
+      toast.info('No templates selected')
+      return
+    }
+
+    const selectedTemplates = templates.filter((template) =>
+      selectedTemplateIds.includes(template.id)
+    )
+
+    if (selectedTemplates.length === 0) {
+      toast.info('No templates selected')
+      return
+    }
+
+    setIsGeneratingAll(true)
+    setGenerateAllTotal(selectedTemplates.length)
+    setGenerateAllCompleted(0)
+    setFinishedTemplateNames([])
+
+    let successCount = 0
+    let failCount = 0
+    const pdfUrl = buildPdfPreviewUrl(editor.apiUrl, editor)
+    const headers = buildAuthHeaders(editor)
+
+    try {
+      for (const template of selectedTemplates) {
+        const templateDisplayName =
+          template.name || template.fileName || template.id
+        try {
+          const htmlContent = await getTemplateHtmlForGenerate(template, editor)
+          const sampleData = template.sampleJsonData?.trim()
+            ? JSON.parse(template.sampleJsonData)
+            : {}
+
+          const response = await fetch(pdfUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              templateName: template.name || template.fileName || 'Untitled',
+              description: template.fileName || template.name || '',
+              data: sampleData,
+              templateContent: htmlContent,
+              pageSettings: template.pageSettings || {},
+            }),
+          })
+
+          if (!response.ok) {
+            throw new Error(`PDF generation failed (${response.status})`)
+          }
+
+          const blob = await response.blob()
+          const safeName = (template.name || template.fileName || template.id)
+            .replace(/[^a-zA-Z0-9-_]+/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_|_$/g, '') || 'template'
+          downloadBlob(blob, `${safeName}.pdf`)
+          successCount += 1
+          setFinishedTemplateNames((prev) => [...prev, templateDisplayName])
+        } catch (err) {
+          failCount += 1
+          const message = err instanceof Error ? err.message : 'Unknown error'
+          console.error(`Generate failed for ${template.id}:`, message)
+          setFinishedTemplateNames((prev) => [
+            ...prev,
+            `${templateDisplayName} (failed)`,
+          ])
+        } finally {
+          setGenerateAllCompleted((prev) => prev + 1)
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Generated ${successCount} PDF${successCount > 1 ? 's' : ''}`)
+      }
+
+      if (failCount > 0) {
+        toast.error(`Failed to generate ${failCount} template${failCount > 1 ? 's' : ''}`)
+      }
+    } finally {
+      setIsGeneratingAll(false)
+    }
+  }, [
+    editor,
+    selectedTemplateIds,
+    templates,
+    buildPdfPreviewUrl,
+    buildAuthHeaders,
+    getTemplateHtmlForGenerate,
+  ])
 
   const handleCreateTemplate = async () => {
     if (!editor) {
@@ -443,6 +639,8 @@ export default function DocifyPage() {
     return { start, end }
   }
 
+  const remainingToGenerate = Math.max(0, generateAllTotal - generateAllCompleted)
+
   return (
     <main className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl px-4 py-8">
@@ -525,6 +723,17 @@ export default function DocifyPage() {
                   Page {currentPage} of {totalPages}
                 </div>
                 <div className="flex items-center gap-3">
+                  <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                    <input
+                      ref={selectAllCheckboxRef}
+                      type="checkbox"
+                      className="h-4 w-4 accent-primary"
+                      checked={allFilteredSelected}
+                      onChange={toggleSelectAllFilteredTemplates}
+                      aria-label="Select all filtered templates"
+                    />
+                    Select all
+                  </label>
                   <label className="text-sm text-muted-foreground">
                     Items per page
                   </label>
@@ -776,7 +985,7 @@ export default function DocifyPage() {
 
       {selectedTemplateIds.length > 0 && (
         <div className="fixed bottom-6 left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-lg border border-border bg-background p-3 shadow-lg">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <p className="text-sm text-muted-foreground">
               {selectedTemplateIds.length} selected
             </p>
@@ -784,9 +993,30 @@ export default function DocifyPage() {
               <Button variant="outline" onClick={() => setSelectedTemplateIds([])}>
                 Clear
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => void handleGenerateAll()}
+                disabled={isGeneratingAll}
+              >
+                {isGeneratingAll ? 'Generating...' : 'Generate All'}
+              </Button>
               <Button onClick={handleMoveTemplates}>Move</Button>
             </div>
           </div>
+          {(isGeneratingAll || generateAllCompleted > 0) && (
+            <div className="mt-3 rounded-md border border-border/70 bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">
+                {generateAllCompleted}/{generateAllTotal} finished • {remainingToGenerate} remaining
+              </p>
+              {finishedTemplateNames.length > 0 && (
+                <div className="mt-2 max-h-24 overflow-y-auto text-xs text-muted-foreground">
+                  {finishedTemplateNames.map((name, index) => (
+                    <p key={`${name}-${index}`}>{name}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
